@@ -12,6 +12,7 @@
   "dependencies": {
     "@tensorflow/tfjs": "^4.19.0",
     "@tensorflow/tfjs-node": "^4.19.0",
-    "robotjs": "^0.6.0"
+    "robotjs": "^0.6.0",
+    "uuid": "^9.0.1"
   }
 }
