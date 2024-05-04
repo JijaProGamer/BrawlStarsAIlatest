@@ -1,0 +1,7 @@
+npm install
+cd .\node_modules\robotjs\
+
+Change line 19 from
+        (win32KeyEvent(key, flags), Sleep(DEADBEEF_RANDRANGE(63, 125)))
+to
+		(win32KeyEvent(key, flags))

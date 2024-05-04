@@ -1,0 +1,17 @@
+{
+  "name": "brawlstarsai",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.19.0",
+    "@tensorflow/tfjs-node": "^4.19.0",
+    "robotjs": "^0.6.0"
+  }
+}
