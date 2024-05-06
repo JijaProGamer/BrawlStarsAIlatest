@@ -3,46 +3,54 @@ const tf = require("@tensorflow/tfjs-node")
 let model
 let resolution
 
+const InputElements = 36;
+const OutputElements = 10;
+
 function makeModel(_resolution) {
   resolution = _resolution;
-  model = tf.sequential();
 
-  model.add(tf.layers.conv2d({
-    inputShape: [resolution[0], resolution[1], 2],
-    kernelSize: 5,
-    filters: 8,
-    strides: 1,
-    activation: 'relu',
-    kernelInitializer: 'varianceScaling'
-  }));
+  /*model = tf.sequential();
 
+  model.add(tf.layers.conv2d({ kernelSize: 3, filters: 32, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling', inputShape: [resolution[0], resolution[1], 2] }));
   model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
-
-  model.add(tf.layers.conv2d({
-    kernelSize: 5,
-    filters: 16,
-    strides: 1,
-    activation: 'relu',
-    kernelInitializer: 'varianceScaling'
-  }));
+  model.add(tf.layers.conv2d({ kernelSize: 3, filters: 64, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling'}));
   model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
-
   model.add(tf.layers.flatten());
+  model.add(tf.layers.dense({ units: OutputElements, kernelInitializer: 'varianceScaling', activation: 'tanh'}));
+  */
 
-  const NUM_OUTPUT_CLASSES = 2;
-  model.add(tf.layers.dense({
-    units: NUM_OUTPUT_CLASSES,
-    kernelInitializer: 'varianceScaling',
-    activation: 'tanh'
-  }));
+  const imageInput = tf.input({ shape: [_resolution[0], _resolution[1], 2] });
+  const additionalDataInput = tf.input({ shape: [InputElements] });
+  
+  const convLayer1 = tf.layers.conv2d({ kernelSize: 5, filters: 64, strides: 1, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling' });
+  const maxPoolLayer = tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] });
+  const convLayer2 = tf.layers.conv2d({ kernelSize: 3, filters: 32, strides: 1, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling' });
+  
+  const flattenLayer = tf.layers.flatten();
+  const denseLayer1 = tf.layers.dense({ units: 256, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU' });
+  const denseLayer2 = tf.layers.dense({ units: 512, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU' });
+  const outputLayer = tf.layers.dense({ units: OutputElements, kernelInitializer: 'varianceScaling', activation: 'tanh' });
+  
+  const convOutput1 = convLayer1.apply(imageInput);
+  const maxPoolOutput = maxPoolLayer.apply(convOutput1);
+  const convOutput2 = convLayer2.apply(maxPoolOutput);
+  //const convOutput2 = convLayer2.apply(convOutput1);
+  
+  const mergedOutput = tf.layers.concatenate().apply([flattenLayer.apply(convOutput2), additionalDataInput]);
+  const denseOutput1 = denseLayer1.apply(mergedOutput);
+  const denseOutput2 = denseLayer2.apply(denseOutput1);
+  const output = outputLayer.apply(denseOutput2);
+  
+  model = tf.model({ inputs: [imageInput, additionalDataInput], outputs: output });
 
 
   const optimizer = tf.train.adam();
   model.compile({
     optimizer: optimizer,
-    loss: 'categoricalCrossentropy',
+    loss: 'meanSquaredError',
     metrics: ['accuracy'],
   });
+
 
   //model.summary()
 }
@@ -84,19 +92,15 @@ async function train(data) {
   });
 }
 
-async function predict(image) {
-  let imageTensor = tf.tensor(image, [resolution[0], resolution[1], 2])
-    .div(tf.scalar(255))
-    .expandDims();
+async function predict(imageTensor, environment) {
+  console.log(environment, environment.length)
 
+  let dataTensor = tf.tensor2d(environment, [1, environment.length])
+  const predictions = model.predict([imageTensor, dataTensor]);
+  const predictionsCPU = await predictions.dataSync();
 
-  const predictions = model.predict(imageTensor);
-  const predictedClass = await predictions.dataSync();// predictions.argMax(1).dataSync()[0];
-
-  imageTensor.dispose()
   predictions.dispose()
-
-  return predictedClass;
+  return predictionsCPU;
 }
 
 module.exports = { makeModel, train, predict }

@@ -9,9 +9,10 @@ function spawnScreen(Resolution, Framerate, WindowTitle) {
             `--video-bit-rate=2000K`, // max 2 megabits per second
             `--max-fps=${Framerate * 2}`, // set fps
             `--video-codec=h264`, // set codec (h264/h265)
-            //`--display-buffer=${Math.ceil(1000/framerate)}` // set display buffer to remove tearing
+            //`--display-buffer=${Math.ceil(1000/Framerate)}`, // set display buffer to remove tearing
             `--keyboard=uhid`, // hardware keyboard simulation
-            `--mouse=uhid`, // hardware mouse simulation
+            `--mouse=sdk`,
+            //`--mouse=uhid`, // hardware mouse simulation
             //`--mouse=disabled`,
             `--stay-awake`, // stops screen from going to sleep
             '--disable-screensaver', // stops screen from going to sleep
@@ -97,22 +98,26 @@ function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
 }
 
 function parseRawVideoData(data) {
-    const pixels = Array(data.length / 2);
+    const pixels = Array(data.length * 2/4);
 
     for (let i = 0; i < data.length; i += 4) {
         const red = data.readUInt8(i);
-        //const green = data.readUInt8(i + 1);
+        const green = data.readUInt8(i + 1);
         const blue = data.readUInt8(i + 2);
 
-        let index = i / 2;
+        let index = i * 2/4;
 
-        pixels[index] = red;
-        pixels[index + 1] = blue;
+        pixels[index] = red + Math.floor(green / 2);
+        //pixels[index + 1] = green;
+        //pixels[index + 2] = blue;
+        pixels[index + 1] = blue + Math.floor(green / 2);
     }
 
 
     return pixels;
 }
+
+const fs = require("fs");
 
 module.exports = function StartScreen(Resolution, Framerate, WindowTitle, onFrame) {
     return new Promise(async (resolve, reject) => {
@@ -134,22 +139,15 @@ module.exports = function StartScreen(Resolution, Framerate, WindowTitle, onFram
         /*let frameIndex = 0
         function onFrame(pixels) {
             frameIndex += 1;
-
             pixels = parseRawVideoData(pixels)
 
-            let ppm = `P3\n${recordingResolution[0]} ${recordingResolution[1]}\n255\n`;
+            let ppm = `P3\n${Resolution[0]} ${Resolution[1]}\n255\n`;
 
             for (let i = 0; i < pixels.length; i += 2) {
                 ppm += `${pixels[i]} 0 ${pixels[i + 1]} `;
             }
 
-            require("fs").writeFile(`./tmp/frame${frameIndex}.ppm`, ppm, "utf-8", () => { })
-
-            /*pixels = parseRawVideoData(pixels)
-            console.time("start")
-            let prediction = predict(recordingResolution, pixels)
-            console.timeEnd("start")
-            //console.log(prediction)
+            fs.writeFile(`./tmp/frame${frameIndex}.ppm`, ppm, "utf-8", () => { })
         }*/
 
         setTimeout(() => {

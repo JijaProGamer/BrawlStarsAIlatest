@@ -14,6 +14,7 @@ const keyboardPositions = [
 class MouseControlType {
     #point = [0, 0];
     #radius = 10;
+    wasMoving = false;
 
     constructor(radius, point){
         this.#radius = radius;
@@ -30,6 +31,19 @@ class MouseControlType {
     }
 
     move(position){
+        let positionDistance = Math.sqrt(position.x * position.x + position.y * position.y);
+
+        if(positionDistance < 0.1){
+            this.stop()
+            this.wasMoving = false;
+            return;
+        }
+
+        if(!this.wasMoving){
+            this.begin();
+            this.wasMoving = true;
+        }
+
         mouseDrag(this.#point[0] + position[0] * this.#radius, this.#point[1] + position[1] * this.#radius)
     }
 }
@@ -75,9 +89,9 @@ class KeyboardControlType {
     }
 
     move(position){
-        let positionDistance = position.x * position.x + position.y * position.y;
+        let positionDistance = Math.sqrt(position.x * position.x + position.y * position.y);
 
-        if(positionDistance < 0.15){
+        if(positionDistance < 0.25){
             this.stopAll();
             return;
         }
@@ -98,4 +112,24 @@ class KeyboardControlType {
     }
 }
 
-module.exports = { MouseControlType, KeyboardControlType };
+class ButtonColtrolType {
+    #button;
+
+    constructor(button){
+        this.#button = button;
+    }
+
+    tap(time=0){
+        if(time > 0){
+            KeyToggle(this.#button, "down");
+            setTimeout(() => {
+                KeyToggle(this.#button, "up");
+            }, time)
+        } else {
+            KeyToggle(this.#button, "down");
+            KeyToggle(this.#button, "up");
+        }
+    }
+}
+
+module.exports = { MouseControlType, KeyboardControlType, ButtonColtrolType };

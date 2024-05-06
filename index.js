@@ -1,6 +1,5 @@
 const { Environment } = require("./ai/environment.js")
 
-const { MouseControlType, KeyboardControlType } = require("./control/control.js")
 const StartScreen = require("./screen/screen.js")
 const uuid = require("uuid")
 
@@ -43,9 +42,10 @@ async function OnFrame(frameData){
 }
 
 async function Run(){
+    console.time("frame time");
     [screenProcess, ffmpegProcess] = await StartScreen(Resolution, framerate, `${windowTitle}-${uuid.v4()}`, OnFrame);
 
-
+    console.timeEnd("frame time");
 }
 
 Run()
