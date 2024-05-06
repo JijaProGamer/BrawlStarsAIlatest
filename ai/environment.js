@@ -6,6 +6,9 @@ const environmentModel = require("./environmentModel.js")
 class Environment {
     Resolution;
 
+    ActorModel;
+    EnvironmentModel;
+
     Actor = new Actor();
     Friendly = [new Player(), new Player()];
     Enemy = [new Player(), new Player(), new Player()]
@@ -16,13 +19,16 @@ class Environment {
     constructor(Resolution){
         this.Resolution = Resolution;
 
-        actorModel.makeModel(Resolution);
-        environmentModel.makeModel(Resolution);
+        this.ActorModel = new actorModel(Resolution)
+        this.EnvironmentModel = new environmentModel(Resolution)
+
+        this.ActorModel.makeModel(Resolution);
+        this.EnvironmentModel.makeModel(Resolution);
     }
 
     async CreateWorld(Image, imageTensor){
         console.time("world prediction")
-        let prediction = await environmentModel.predict(imageTensor);
+        let prediction = await this.EnvironmentModel.predict(imageTensor);
         console.timeEnd("world prediction")
 
         if(prediction[0] >= 0 && prediction[1] >= 0){
@@ -123,8 +129,10 @@ class Environment {
 
         await this.CreateWorld(Image, imageTensor);
         //console.time("actor actions prediction")
-        let prediction = await actorModel.predict(imageTensor, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
+        let prediction = await this.ActorModel.act(imageTensor, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
         //console.timeEnd("actor actions prediction")
+
+        console.log(prediction)
 
         this.SetActor(prediction)
     }
