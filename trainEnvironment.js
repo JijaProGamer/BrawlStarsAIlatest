@@ -96,10 +96,6 @@ function transcodeJsonFile(fileName){
     return result
 }
 
-const PARAMETERS_PER_PLAYER = 1 + 2;// + 2;
-const PARAMETERS_PER_BALL = 2 + 1;
-const PARAMETERS = PARAMETERS_PER_BALL + 6 * PARAMETERS_PER_PLAYER;
-
 async function prepareTrainingData(files) {
     let images = [];
     let results = [];
@@ -109,17 +105,17 @@ async function prepareTrainingData(files) {
 
         const preprocessedImage = tf.tensor(image, [model.Resolution[0], model.Resolution[1], 2])
             .div(tf.scalar(255))
-            .expandDims();
+            //.expandDims();
         
-        const result = tf.tensor(transcodeJsonFile(fileName), [1,PARAMETERS]);
+        const result = tf.tensor1d(transcodeJsonFile(fileName));
 
         images.push(preprocessedImage);
         results.push(result);
     }
 
 
-    const xTrain = tf.concat(images);
-    const yTrain = tf.concat(results).reshape([results.length, PARAMETERS]);
+    const xTrain = tf.stack(images);
+    const yTrain = tf.stack(results);
 
     return { xTrain, yTrain, images, results };
 }
@@ -132,10 +128,10 @@ prepareTrainingData(files).then((trainingData) => {
     model.train(trainingData.xTrain, trainingData.yTrain).then(() => {
         model.save(path.join(__dirname, "ai/environment"))
 
-        console.log(files[1])
+        console.log(files[4])
 
         console.time("start")
-        model.predict(trainingData.images[1]).then((predictResult) => {
+        model.predict(trainingData.images[4].expandDims()).then((predictResult) => {
             console.timeEnd("start")
             console.log(predictResult)
         })
