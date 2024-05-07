@@ -75,9 +75,9 @@ testImage.pixels = HideImagePart(testImage.pixels, testImage.resolution, [sx - 2
 CalculatePlayerHealth(testImage.pixels, testImage.resolution, [sx, sy])
 saveImageToPPM("./testOutput.ppm", testImage.resolution, testImage.pixels)*/ // health
 
-let sx = 218
-let sy = 102
-let radius = 3
+let sx = 279
+let sy = 121
+let radius = 10
 
 testImage.pixels = HideImagePart(testImage.pixels, testImage.resolution, [sx - radius, sy - radius], [sx + radius, sy + radius])
 saveImageToPPM("./testOutput.ppm", testImage.resolution, testImage.pixels)

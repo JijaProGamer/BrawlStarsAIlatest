@@ -31,27 +31,28 @@ class Environment {
         let prediction = await this.EnvironmentModel.predict(imageTensor);
         console.timeEnd("world prediction")
 
-        if(prediction[0] >= 0 && prediction[1] >= 0){
-            this.BallPosition = [prediction[0], prediction[1]]
+        if(prediction[0] > 0){
+            this.BallPosition = [prediction[1], prediction[2]]
         } else {
             this.BallPosition = [-1, -1]
         }
 
-        let lastIndex = 2;
+        let lastIndex = 3;
 
         function setPlayer(player){
-            if(prediction[lastIndex] > -1){
+            if(prediction[lastIndex] > 0){
                 player.Position = [prediction[lastIndex + 1], prediction[lastIndex + 2]];
-                player.HasUltra = prediction[lastIndex + 3] > 0;
-                player.HasHypercharge = prediction[lastIndex + 4] > 0;
+                //player.HasUltra = prediction[lastIndex + 3] > 0;
+                //player.HasHypercharge = prediction[lastIndex + 4] > 0;
             } else {
-                player.HasUltra = false;
-                player.HasHypercharge = false;
+                //player.HasUltra = false;
+                //player.HasHypercharge = false;
                 player.Position = [-1, -1];
                 player.Health = 0;
             }
 
-            lastIndex += 5;;
+            //lastIndex += 5;
+            lastIndex += 3;
         }
 
         function setLocalPlayer(){
@@ -131,8 +132,6 @@ class Environment {
         //console.time("actor actions prediction")
         let prediction = await this.ActorModel.act(imageTensor, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
         //console.timeEnd("actor actions prediction")
-
-        console.log(prediction)
 
         this.SetActor(prediction)
     }

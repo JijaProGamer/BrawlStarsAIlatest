@@ -10,8 +10,8 @@ class Player {
 }
 
 let MoveController = new KeyboardControlType(["w", "s", "a", "d", "wa", "wd", "sa", "sd"])
-let ShootController = new MouseControlType(15, [253, 90]);
-let UltraController = new MouseControlType(10, [218, 102]);
+let ShootController = new MouseControlType(13, [249, 118]);
+let UltraController = new MouseControlType(13, [279, 121]);
 let GadgetController = new ButtonColtrolType("z");
 let HyperchargeController = new ButtonColtrolType("x");
 

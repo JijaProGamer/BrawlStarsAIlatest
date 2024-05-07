@@ -13,7 +13,7 @@ class ActorModel {
     this.Resolution = Resolution;
     this.learningRate = 0.001; // how much to take into consideration a single memory step
     this.gamma = 0.99; // how much to value longer term benefits (higher number = values more long term benefits)
-    this.epsilon = 1.0; // how much to randomise output, to explore the environment, to learn it
+    this.epsilon = 0.65; // how much to randomise output, to explore the environment, to learn it
     this.epsilonDecay = 0.995; // how fast to stop learning the environment
     this.minEpsilon = 0.01; // the minimum chance to explore the environment
     this.bufferSize = brawlballLength * averageFPS; // how big should the memory buffer be
@@ -58,8 +58,8 @@ class ActorModel {
       metrics: ['accuracy'],
     });
 
-    return model;
-    //model.summary()
+    model.summary()
+    return model
   }
 
   async predict(state) {
@@ -107,6 +107,7 @@ class ActorModel {
     const tensorTargets = tf.tensor(targets);
 
     this.model.fit(tensorStates, tensorTargets, { epochs: 1, verbose: 0 });
+    this.decayEpsilon()
   }
 
   updateTargetModel() {
