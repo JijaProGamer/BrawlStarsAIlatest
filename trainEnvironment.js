@@ -15,10 +15,10 @@ function parseRawVideoData(data) {
 
         let index = i * 2/4;
 
-        pixels[index] = red + Math.floor(green / 2);
+        pixels[index] = red;// + Math.floor(green / 2);
         //pixels[index + 1] = green;
         //pixels[index + 2] = blue;
-        pixels[index + 1] = blue + Math.floor(green / 2);
+        pixels[index + 1] = blue;// + Math.floor(green / 2);
     }
 
 
@@ -96,21 +96,30 @@ function transcodeJsonFile(fileName){
     return result
 }
 
+const PARAMETERS_PER_PLAYER = 1 + 2;// + 2;
+const PARAMETERS_PER_BALL = 2 + 1;
+const PARAMETERS = PARAMETERS_PER_BALL + 6 * PARAMETERS_PER_PLAYER;
+
 async function prepareTrainingData(files) {
     let images = [];
     let results = [];
 
     for (let fileName of files) {
         const image = await trascodeImageFile(fileName);
-        const preprocessedImage = tf.tensor(image, [1, model.Resolution[0], model.Resolution[1], 2]).div(tf.scalar(255));
-        const result = transcodeJsonFile(fileName);
+
+        const preprocessedImage = tf.tensor(image, [model.Resolution[0], model.Resolution[1], 2])
+            .div(tf.scalar(255))
+            .expandDims();
+        
+        const result = tf.tensor(transcodeJsonFile(fileName), [1,PARAMETERS]);
 
         images.push(preprocessedImage);
         results.push(result);
     }
 
+
     const xTrain = tf.concat(images);
-    const yTrain = tf.tensor2d(results);
+    const yTrain = tf.concat(results).reshape([results.length, PARAMETERS]);
 
     return { xTrain, yTrain, images, results };
 }

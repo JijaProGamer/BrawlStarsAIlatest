@@ -14,12 +14,12 @@ class EnvironmentModel {
     makeModel() {
       this.model = tf.sequential();
   
-      this.model.add(tf.layers.conv2d({ kernelSize: 15, filters: 32, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling', inputShape: [this.Resolution[0], this.Resolution[1], 2] }));
+      this.model.add(tf.layers.conv2d({ kernelSize: 15, filters: 32, strides: 1, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling', inputShape: [this.Resolution[0], this.Resolution[1], 2] }));
       this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
-      this.model.add(tf.layers.conv2d({ kernelSize: 15, filters: 32, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling'}));
+      this.model.add(tf.layers.conv2d({ kernelSize: 15, filters: 32, strides: 1, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling'}));
       //this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
-      this.model.add(tf.layers.dense({ units: 128, kernelInitializer: 'varianceScaling', activation: 'relu' }))
-      this.model.add(tf.layers.dense({ units: 256, kernelInitializer: 'varianceScaling', activation: 'relu' }))
+      this.model.add(tf.layers.dense({ units: 128, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU' }))
+      this.model.add(tf.layers.dense({ units: 256, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU' }))
       this.model.add(tf.layers.flatten());
       this.model.add(tf.layers.dense({ units: PARAMETERS, kernelInitializer: 'varianceScaling', activation: 'tanh'}));
       //this.model.add(tf.layers.dense({ units: PARAMETERS, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU'}));
@@ -54,7 +54,7 @@ class EnvironmentModel {
       return this.model.fit(images, results, {
         batchSize: BATCH_SIZE,
         //validationData: [testXs, testYs],
-        epochs: 10,
+        epochs: 100,
         shuffle: true,
         callbacks: { onBatchEnd }
       });
