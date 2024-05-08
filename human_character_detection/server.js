@@ -21,13 +21,19 @@ app.get('/images', (req, res) => {
     res.json(imagesRaw);
 })
 
-app.post('/image', express.json(), (req, res) => {
+app.post('/image', (req, res) => {
     let image = req.body.image;
     let data = req.body.data;
-    
-    fs.copyFileSync(path.join(__dirname, "images", `${image}.png`), path.join(__dirname, "training_data", `${image}.png`));
-    fs.rmSync(path.join(__dirname, "images", `${image}.png`));
-    fs.writeFileSync(path.join(__dirname, "training_data", `${image}.json`), JSON.stringify(data), "utf-8");
+
+    try {
+        fs.copyFileSync(path.join(__dirname, "images", `${image}.png`), path.join(__dirname, "training_data", `${image}.png`));
+        fs.rmSync(path.join(__dirname, "images", `${image}.png`));
+        fs.writeFileSync(path.join(__dirname, "training_data", `${image}.json`), JSON.stringify(data), "utf-8");
+    } catch (err){
+
+    }
+
+    res.sendStatus(201)
 });
 
 app.listen(port, () => {

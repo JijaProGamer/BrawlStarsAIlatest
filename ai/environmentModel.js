@@ -14,17 +14,17 @@ class EnvironmentModel {
     makeModel() {
       this.model = tf.sequential();
   
-      this.model.add(tf.layers.conv2d({ kernelSize: 5, filters: 32, strides: 2, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling', inputShape: [this.Resolution[0], this.Resolution[1], 2] }));
+      this.model.add(tf.layers.conv2d({ kernelSize: 5, filters: 64, strides: 1, activation: 'ReLU', kernelInitializer: 'varianceScaling', inputShape: [this.Resolution[0], this.Resolution[1], 3] }));
       this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
-      this.model.add(tf.layers.dropout({ rate: 0.2 }));
-      this.model.add(tf.layers.conv2d({ kernelSize: 9, filters: 64, strides: 1, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling'}));
-      //this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
+      //this.model.add(tf.layers.dropout({ rate: 0.2 }));
+      this.model.add(tf.layers.conv2d({ kernelSize: 7, filters: 128, strides: 2, activation: 'ReLU', kernelInitializer: 'varianceScaling'}));
+      this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
       this.model.add(tf.layers.flatten());
-      this.model.add(tf.layers.dropout({ rate: 0.4 }));
-      this.model.add(tf.layers.dense({ units: 128, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
-      this.model.add(tf.layers.dense({ units: 256, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
-      this.model.add(tf.layers.dense({ units: 512, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
-      this.model.add(tf.layers.dense({ units: 128, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
+      //this.model.add(tf.layers.dropout({ rate: 0.2 }));
+      this.model.add(tf.layers.dense({ units: 256, kernelInitializer: 'varianceScaling', activation: 'ReLU', kernelRegularizer: tf.regularizers.l2() }))
+      this.model.add(tf.layers.dense({ units: 256, kernelInitializer: 'varianceScaling', activation: 'ReLU', kernelRegularizer: tf.regularizers.l2() }))
+      //this.model.add(tf.layers.dense({ units: 512, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
+      //this.model.add(tf.layers.dense({ units: 128, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
       //this.model.add(tf.layers.dense({ units: PARAMETERS, kernelInitializer: 'varianceScaling', activation: 'tanh'}));
       this.model.add(tf.layers.dense({ units: PARAMETERS, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU'}));
 

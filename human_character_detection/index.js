@@ -32,7 +32,7 @@ function workCharacter(editingType, character){
             overlayCanvasContext.arc(
                 Math.round(character.position[0] * overlayCanvas.width), 
                 Math.round(character.position[1] * overlayCanvas.height), 
-                characterRadius, 
+                editingType == "ball" ? ballRadius : characterRadius, 
                 0, 2 * Math.PI
             );
         
@@ -82,7 +82,7 @@ function drawMouseOverlay(editingType, x, y){
     overlayCanvasContext.arc(
         Math.round(x * overlayCanvas.width), 
         Math.round(y * overlayCanvas.height), 
-        characterRadius, 
+        editingType == "ball" ? ballRadius : characterRadius, 
         0, 2 * Math.PI
     );
 
@@ -161,6 +161,7 @@ function resetImageValues(){
     imageSelectors = JSON.parse(JSON.stringify(rawImageSelectors))
     JSON.parse(JSON.stringify(rawActiveEditorType))
 
+    drawMouseOverlay()
     workOverlay()
 }
 
@@ -183,8 +184,8 @@ function loadURL(url) {
     urlImage.src = url;
 }
 
-function uploadData(){
-    fetch('/image', {
+async function uploadData(){
+    return (await fetch('/image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -193,7 +194,7 @@ function uploadData(){
             data: imageSelectors,
             image: currentImage
         })
-    })
+    })).json
 }
 
 function createImageButton(index, imageName) {
@@ -205,13 +206,15 @@ function createImageButton(index, imageName) {
     div.addEventListener('click', function() {
         if(div == photosList.children[0]){
             //if(true){
-                uploadData()
+                uploadData().then(() => {
+                    //div.remove();
+                    //images.shift();
+                    //loadImage();
+        
+                    //resetImageValues()
 
-                div.remove();
-                images.shift();
-                loadImage();
-    
-                resetImageValues()
+                    location.reload();
+                })
             //} else {
             //    alert(`You need to finish the current image to continue!`);
             //}
