@@ -97,20 +97,53 @@ function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
     });
 }
 
-function parseRawVideoData(data) {
+function parseRawVideoDataRG(data) {
     const pixels = Array(data.length * 2/4);
+
+    for (let i = 0; i < data.length; i += 4) {
+        const red = data.readUInt8(i);
+        const blue = data.readUInt8(i + 2);
+
+        let index = i * 2/4;
+
+        pixels[index] = red;
+        pixels[index + 1] = blue;
+    }
+
+
+    return pixels;
+}
+
+function parseRawVideoDataRG(data) {
+    const pixels = Array(data.length * 2/4);
+
+    for (let i = 0; i < data.length; i += 4) {
+        const red = data.readUInt8(i);
+        const blue = data.readUInt8(i + 2);
+
+        let index = i * 2/4;
+
+        pixels[index] = red;
+        pixels[index + 1] = blue;
+    }
+
+
+    return pixels;
+}
+
+function parseRawVideoDataRGB(data) {
+    const pixels = Array(data.length * 3/4);
 
     for (let i = 0; i < data.length; i += 4) {
         const red = data.readUInt8(i);
         const green = data.readUInt8(i + 1);
         const blue = data.readUInt8(i + 2);
 
-        let index = i * 2/4;
+        let index = i * 3/4;
 
-        pixels[index] = red + Math.floor(green / 2);
-        //pixels[index + 1] = green;
-        //pixels[index + 2] = blue;
-        pixels[index + 1] = blue + Math.floor(green / 2);
+        pixels[index] = red;
+        pixels[index + 1] = green;
+        pixels[index + 2] = blue;
     }
 
 
@@ -136,24 +169,32 @@ module.exports = function StartScreen(Resolution, Framerate, WindowTitle, onFram
             console.log(`recorder stopped with reason ${reason}`)
         }
 
-        /*let frameIndex = 0
+        let frameIndex = 0
         function onFrame(pixels) {
             frameIndex += 1;
-            pixels = parseRawVideoData(pixels)
+            let pixelsRG = parseRawVideoDataRG(pixels)
+            let pixelsRGB = parseRawVideoDataRGB(pixels)
 
-            let ppm = `P3\n${Resolution[0]} ${Resolution[1]}\n255\n`;
+            let ppmRG = `P3\n${Resolution[0]} ${Resolution[1]}\n255\n`;
 
-            for (let i = 0; i < pixels.length; i += 2) {
-                ppm += `${pixels[i]} 0 ${pixels[i + 1]} `;
+            for (let i = 0; i < pixelsRG.length; i += 2) {
+                ppmRG += `${pixelsRG[i]} 0 ${pixelsRG[i + 1]} `;
             }
 
-            fs.writeFile(`./tmp/frame${frameIndex}.ppm`, ppm, "utf-8", () => { })
-        }*/
+            let ppmRGB = `P3\n${Resolution[0]} ${Resolution[1]}\n255\n`;
+
+            for (let i = 0; i < pixelsRGB.length; i += 3) {
+                ppmRGB += `${pixelsRGB[i]} ${pixelsRGB[i + 1]} ${pixelsRGB[i + 2]} `;
+            }
+
+            fs.writeFile(`./tmp/frame${frameIndex}RG.ppm`, ppmRG, "utf-8", () => { })
+            fs.writeFile(`./tmp/frame${frameIndex}RGB.ppm`, ppmRGB, "utf-8", () => { })
+        }
 
         setTimeout(() => {
             recorder = spawnScreenRecorder(
                 Resolution, Framerate, WindowTitle, 
-                { onStart, onError, onClose, onFrame: (pixels) => onFrame(parseRawVideoData(pixels)) }
+                { onStart, onError, onClose, onFrame/*: (pixels) => onFrame(parseRawVideoDataRG(pixels))*/ }
             )
         }, 1000)
     })

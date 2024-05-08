@@ -11,7 +11,7 @@ mainCanvas.height = 136;
 overlayCanvas.width = mainCanvas.width;
 overlayCanvas.height = mainCanvas.height;
 
-let rawCharacterSelector = {start: [-1, -1], extend: [-1, -1], isVisible: false}
+let rawCharacterSelector = {position: [-1, -1], isVisible: false}
 let rawImageSelectors = {
     ball: rawCharacterSelector, 
     me: rawCharacterSelector, 
@@ -19,54 +19,82 @@ let rawImageSelectors = {
     enemy: [rawCharacterSelector, rawCharacterSelector, rawCharacterSelector]
 }
 
-let rawActiveEditorType = {type: null, value: 0, index: null}
+let rawActiveEditorType = {type: null, index: null}
 let activeEditorType = JSON.parse(JSON.stringify(rawActiveEditorType))
 let imageSelectors = JSON.parse(JSON.stringify(rawImageSelectors))
 let imageSelectorsKeys = Object.keys(imageSelectors)
 
-function workCharacter(character){
+function workCharacter(editingType, character){
     if(character.isVisible){
-        if(character.extend[0] > 0 && character.extend[1] > 0){
-            overlayCanvasContext.strokeStyle = 'yellow';
+        if(character.position[0] > 0 && character.position[1] > 0){
+            overlayCanvasContext.beginPath();
 
-            overlayCanvasContext.strokeRect(
-                character.start[0] * mainCanvas.width, 
-                character.start[1] * mainCanvas.height, 
-                character.extend[0] * mainCanvas.width,
-                character.extend[1] * mainCanvas.height, 
+            overlayCanvasContext.arc(
+                Math.round(character.position[0] * overlayCanvas.width), 
+                Math.round(character.position[1] * overlayCanvas.height), 
+                characterRadius, 
+                0, 2 * Math.PI
             );
+        
+            let color = colors[editingType];
+            
+            overlayCanvasContext.fillStyle = "rgba(255, 255, 255, 0.2)";
+            overlayCanvasContext.fill();
+        
+            overlayCanvasContext.lineWidth = 1;
+            overlayCanvasContext.strokeStyle = "blue";
+            overlayCanvasContext.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`;
+            overlayCanvasContext.stroke();           overlayCanvasContext.stroke();
         }
-
-        overlayCanvasContext.fillStyle = 'dark';
-
-        overlayCanvasContext.fillRect(
-            character.start[0] * mainCanvas.width - 2, 
-            character.start[1] * mainCanvas.height - 2, 
-            4, 4
-        );
-
-        overlayCanvasContext.fillRect(
-            (character.start[0] + character.extend[0]) * mainCanvas.width - 2,
-            (character.start[1] + character.extend[1]) * mainCanvas.height - 2, 
-            4, 4
-        );
     }
 }
 
 async function workOverlay(){
-    overlayCanvasContext.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-
     for(let characterKey of imageSelectorsKeys){
         let character = imageSelectors[characterKey]
 
-        if(character.start){
-            workCharacter(character)
+        if(character.position){
+            workCharacter(characterKey, character)
         } else {
             for(let realCharacter of character){
-                workCharacter(realCharacter)
+                workCharacter(characterKey, realCharacter)
             }
         }
     }
+}
+
+const ballRadius = 5
+const characterRadius = 7
+
+let colors = {
+    ball: [255, 255, 0],
+    enemy: [255, 0, 0],
+    friendly: [0, 255, 0],
+    me: [0, 255, 255],
+}
+
+
+function drawMouseOverlay(editingType, x, y){
+    overlayCanvasContext.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+
+    overlayCanvasContext.beginPath();
+
+    overlayCanvasContext.arc(
+        Math.round(x * overlayCanvas.width), 
+        Math.round(y * overlayCanvas.height), 
+        characterRadius, 
+        0, 2 * Math.PI
+    );
+
+    let color = colors[editingType];
+    
+    overlayCanvasContext.fillStyle = "rgba(255, 255, 255, 0.2)";
+    overlayCanvasContext.fill();
+
+    overlayCanvasContext.lineWidth = 1;
+    overlayCanvasContext.strokeStyle = "blue";
+    overlayCanvasContext.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`;
+    overlayCanvasContext.stroke();
 }
 
 let images;
@@ -99,7 +127,6 @@ function listenImageVisibilityChange(){
             if (event.currentTarget.checked) {
                 parent.isVisible = true;
                 activeEditorType.type = type;
-                activeEditorType.value = 0;
                 activeEditorType.index = index ? parseInt(index) - 1 : null;
             }
         })
@@ -121,10 +148,8 @@ function setImageValues(){
             parent = parent[parseInt(index) - 1]
         }
 
-        valuesHolder.querySelector('.startX').value = parent.start[0];
-        valuesHolder.querySelector('.startY').value = parent.start[1];
-        valuesHolder.querySelector('.extendX').value = parent.extend[0];
-        valuesHolder.querySelector('.extendY').value = parent.extend[1];    
+        valuesHolder.querySelector('.positionX').value = parent.position[0];
+        valuesHolder.querySelector('.positionY').value = parent.position[1];
     }
 }
 
@@ -196,6 +221,18 @@ function createImageButton(index, imageName) {
     photosList.appendChild(div);
 }
 
+overlayCanvas.addEventListener('mousemove', function(event) {
+    var rect = overlayCanvas.getBoundingClientRect();
+    var x = event.clientX - rect.left;
+    var y = event.clientY - rect.top;
+
+    var canvasX = x / rect.width;
+    var canvasY = y / rect.height;
+
+    drawMouseOverlay(activeEditorType.type || "ball",canvasX, canvasY)
+    workOverlay()
+});
+
 overlayCanvas.addEventListener('click', function(event) {
     var rect = overlayCanvas.getBoundingClientRect();
     var x = event.clientX - rect.left;
@@ -210,33 +247,11 @@ overlayCanvas.addEventListener('click', function(event) {
             parent = parent[activeEditorType.index]
         }
 
-        if(activeEditorType.value == 0){
-            parent.start[0] = canvasX
-            parent.start[1] = canvasY
-        }
-
-        if(activeEditorType.value == 1){
-            parent.extend[0] = canvasX - parent.start[0]
-            parent.extend[1] = canvasY - parent.start[1]
-        }
-
-        /*if(parent.extend[0] < 0){
-            parent.start[0] -= parent.extend[0];
-            parent.extend[0] = -parent.extend[0];
-        }
-
-        if(parent.extend[1] < 0){
-            parent.start[1] -= parent.extend[1];
-            parent.extend[1] = -parent.extend[1];
-        }*/
-
-        activeEditorType.value += 1
-
-        if(activeEditorType.value == 2){
-            activeEditorType.value = 0
-        }
+        parent.position[0] = canvasX
+        parent.position[1] = canvasY
     }
 
+    drawMouseOverlay(activeEditorType.type || "ball", canvasX, canvasY)
     workOverlay()
 });
 

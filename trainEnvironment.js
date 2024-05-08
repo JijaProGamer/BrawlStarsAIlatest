@@ -2,8 +2,9 @@ const tf = require("@tensorflow/tfjs-node")
 const fs = require("fs")
 const path = require("path")
 const child_process = require("child_process")
+const { createCanvas, loadImage } = require('canvas');
 
-const EnvironmentModel = require("./ai/environmentModel.js")
+const Environment = require("./ai/environment.js").Environment
 
 function parseRawVideoData(data) {
     const pixels = Array(data.length * 2/4);
@@ -25,8 +26,7 @@ function parseRawVideoData(data) {
     return pixels;
 }
 
-let model = new EnvironmentModel([ 296, 136 ])
-model.makeModel()
+let environment = new Environment([ 296, 136 ])
 
 function trascodeImageFile(file){
     return new Promise((resolve, reject) => {
@@ -42,7 +42,7 @@ function trascodeImageFile(file){
             data = data.toString()
         })
 
-        let frameMaxSize = model.Resolution[0] * model.Resolution[1] * 4;
+        let frameMaxSize = environment.Resolution[0] * environment.Resolution[1] * 4;
         let frameBuffer = Buffer.allocUnsafe(frameMaxSize);
         let frameSize = 0;
     
@@ -62,12 +62,12 @@ function trascodeImageFile(file){
 function transcodeJsonFile(fileName){
     let fileContents = JSON.parse(fs.readFileSync(path.join(__dirname, "human_character_detection/training_data", `${fileName}.json`), "utf-8"));
     
-    let ballPosition = [fileContents.ball.start[0] + fileContents.ball.extend[0] / 2, fileContents.ball.start[1] + fileContents.ball.extend[1] / 2]
+    //let ballPosition = [fileContents.ball.start[0] + fileContents.ball.extend[0] / 2, fileContents.ball.start[1] + fileContents.ball.extend[1] / 2]
     
     let result = [
         fileContents.ball.isVisible ? 1 : -1,
-        fileContents.ball.isVisible ? ballPosition[0] : -1,
-        fileContents.ball.isVisible ? ballPosition[1] : -1,
+        fileContents.ball.isVisible ? fileContents.ball.position[0] : -1,
+        fileContents.ball.isVisible ? fileContents.ball.position[1] : -1,
     ]
 
 
@@ -78,8 +78,8 @@ function transcodeJsonFile(fileName){
             result.push(-1);
         } else {
             result.push(1);
-            result.push(player.start[0] + player.extend[0] / 2);
-            result.push(player.start[1] + player.extend[1] / 2);
+            result.push(player.position[0]);
+            result.push(player.position[1]);
         }
     }
 
@@ -103,7 +103,7 @@ async function prepareTrainingData(files) {
     for (let fileName of files) {
         const image = await trascodeImageFile(fileName);
 
-        const preprocessedImage = tf.tensor(image, [model.Resolution[0], model.Resolution[1], 2])
+        const preprocessedImage = tf.tensor(image, [environment.Resolution[0], environment.Resolution[1], 2])
             .div(tf.scalar(255))
             //.expandDims();
         
@@ -120,30 +120,95 @@ async function prepareTrainingData(files) {
     return { xTrain, yTrain, images, results };
 }
 
+const ballRadius = 5
+const characterRadius = 7
+
+async function visualizePredictions(predictions, imagePath, outputPath){
+    environment.SetWorld(predictions)
+
+    const canvas = createCanvas(...environment.Resolution);
+    const canvasContext = canvas.getContext('2d');
+    canvasContext.imageSmoothingEnabled = false;
+
+    let image = await loadImage(path.join(__dirname, "human_character_detection/training_data", `${imagePath}.png`))
+    canvasContext.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    let colors = {
+        ball: [255, 255, 0],
+        enemy: [255, 0, 0],
+        friendly: [0, 255, 0],
+        me: [0, 255, 255],
+    }
+
+    function workCharacter(character, isBall, isFriendly, isEnemy, isMe){
+        if(character[0] > 0 && character[1] > 0){
+            canvasContext.beginPath();
+
+            canvasContext.arc(
+                Math.round(character[0] * canvas.width),
+                Math.round(character[1] * canvas.height), 
+                isBall ? ballRadius : characterRadius, 
+                0, 2 * Math.PI
+            );
+
+            let color;
+            if(isBall) color = colors.ball;
+            if(isFriendly) color = colors.friendly;
+            if(isMe) color = colors.me;
+            if(isEnemy) color = colors.enemy;
+
+            canvasContext.fillStyle = `rgba(255, 255, 255, 0.2)`;
+            canvasContext.fill();
+        
+            canvasContext.lineWidth = 1;
+            canvasContext.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`;
+            canvasContext.stroke();
+        }
+    }
+
+    workCharacter(environment.BallPosition, true, false, false, false)
+    workCharacter(environment.Actor.Position, false, false, false, true)
+    workCharacter(environment.Friendly[0].Position, false, true, false, false)
+    workCharacter(environment.Friendly[1].Position, false, true, false, false)
+    workCharacter(environment.Enemy[0].Position, false, false, true, false)
+    workCharacter(environment.Enemy[1].Position, false, false, true, false)
+    workCharacter(environment.Enemy[2].Position, false, false, true, false)
+
+
+    canvas.createPNGStream().pipe(fs.createWriteStream(outputPath));
+}
+
 let files = fs.readdirSync(path.join(__dirname, "human_character_detection/training_data"))
     .filter((v) => v.includes(".png"))
     .map((v) => v.split(".png").shift())
 
 prepareTrainingData(files).then((trainingData) => {
-    model.train(trainingData.xTrain, trainingData.yTrain).then(() => {
-        model.save(path.join(__dirname, "ai/environment"))
+    environment.EnvironmentModel.train(trainingData.xTrain, trainingData.yTrain).then(() => {
+        environment.EnvironmentModel.save(path.join(__dirname, "ai/environment"))
 
-        console.log(files[4])
+        let testIndex = 1
+
+        console.log(files[testIndex])
+
+        visualizePredictions(transcodeJsonFile(files[testIndex]), files[testIndex], path.join(__dirname, "tests", `testExpected.png`))
 
         console.time("start")
-        model.predict(trainingData.images[4].expandDims()).then((predictResult) => {
+        environment.EnvironmentModel.predict(trainingData.images[testIndex].expandDims()).then((predictResult) => {
             console.timeEnd("start")
             console.log(predictResult)
+
+            visualizePredictions(predictResult, files[testIndex], path.join(__dirname, "tests", `testResult.png`))
+
         })
     })
 })
 
-/*model.load(path.join(__dirname, "ai/environment")).then(() => {
+/*environment.EnvironmentModel.load(path.join(__dirname, "ai/environment")).then(() => {
     prepareTrainingData(files).then((trainingData) => {
         console.log(files[1])
 
         console.time("start")
-        model.predict(trainingData.images[1]).then((predictResult) => {
+        environment.EnvironmentModel.predict(trainingData.images[1]).then((predictResult) => {
             console.timeEnd("start")
             console.log(predictResult)
         })

@@ -22,7 +22,7 @@ class Environment {
         this.ActorModel = new actorModel(Resolution)
         this.EnvironmentModel = new environmentModel(Resolution)
 
-        this.ActorModel.makeModel(Resolution);
+        //this.ActorModel.makeModel(Resolution); // TODO: Uncomment
         this.EnvironmentModel.makeModel(Resolution);
     }
 
@@ -31,6 +31,10 @@ class Environment {
         let prediction = await this.EnvironmentModel.predict(imageTensor);
         console.timeEnd("world prediction")
 
+        this.SetWorld(prediction)
+    }
+
+    async SetWorld(prediction){
         if(prediction[0] > 0){
             this.BallPosition = [prediction[1], prediction[2]]
         } else {
