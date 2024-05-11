@@ -1,1 +1,0 @@
-tensorboard --logdir .\training_results\fit_logs_1\
