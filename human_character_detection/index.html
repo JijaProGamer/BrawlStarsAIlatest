@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<head>
+    <title> BSAI Human Character Detection</title>
+    <meta charset="UTF-8">
+    <meta name="keywords" content="AI, ML, Bot, Auto-Play, BS, Brawl Stars">
+    <meta name="description" content="Manual character definition for environment detection">
+    <meta name="author" content="Bloxxy213">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <script type="text/javascript" src="/index.js" defer></script>
+</head>
+
+<body>
+    <div id="page-container">
+        <div id="top-container">
+            <div id="photos-list">
+            
+            </div>
+        
+            <div id="canvases">
+                <canvas id="image-canvas" class="image-canvas-data"></canvas>
+                <canvas id="image-canvas-overlay" class="image-canvas-data"></canvas>
+            </div>
+        </div>
+
+        <div id="bottom-container">
+            <div id="environment-data">
+                <div class="environment-variable-holder">
+                    <div class="environment-variable-data ball-data">
+                        <div class="visibility-container">
+                            <p1 class="data-label">Ball visibility: </p1>
+                            <input type="checkbox" class="visibility"/>
+                        </div>
+        
+                        <p1 class="data-label">position: </p1>
+                        <input type="number" class="positionX" /> <input type="number" class="positionY" />
+                    </div>
+                </div>
+    
+    
+                <div class="environment-variable-holder">
+                    <div class="environment-variable-data me-data">
+                        <div class="visibility-container">
+                            <p1 class="data-label">Me visibility: </p1>
+                            <input type="checkbox" class="visibility"/>
+                        </div>
+        
+                        <p1 class="data-label">position: </p1>
+                        <input type="number" class="positionX" /> <input type="number" class="positionY" />
+                    </div>
+                </div>
+    
+    
+                <div class="environment-variable-holder">
+                    <div class="environment-variable-data friendly-1-data">
+                        <div class="visibility-container">
+                            <p1 class="data-label">Friendly #1 visibility: </p1>
+                            <input type="checkbox" class="visibility"/>
+                        </div>
+        
+                        <p1 class="data-label">position: </p1>
+                        <input type="number" class="positionX" /> <input type="number" class="positionY" />
+                    </div>
+        
+                    <div class="environment-variable-data friendly-2-data">
+                        <div class="visibility-container">
+                            <p1 class="data-label" class="visibility">Friendly #2 visibility: </p1>
+                            <input type="checkbox"/>
+                        </div>
+        
+                        <p1 class="data-label">position: </p1>
+                        <input type="number" class="positionX" /> <input type="number" class="positionY" />
+                    </div>
+                </div>
+    
+    
+                <div class="environment-variable-holder">
+                    <div class="environment-variable-data enemy-1-data">
+                        <div class="visibility-container">
+                            <p1 class="data-label">Enemy #1 visibility: </p1>
+                            <input type="checkbox" class="visibility"/>
+                        </div>
+        
+                        <p1 class="data-label">position: </p1>
+                        <input type="number" class="positionX" /> <input type="number" class="positionY" />
+                    </div>
+        
+                    <div class="environment-variable-data enemy-2-data">
+                        <div class="visibility-container">
+                            <p1 class="data-label">Enemy #2 visibility: </p1>
+                            <input type="checkbox"class="visibility"/>
+                        </div>
+        
+                        <p1 class="data-label">position: </p1>
+                        <input type="number" class="positionX" /> <input type="number" class="positionY" />
+                    </div>
+        
+                    <div class="environment-variable-data enemy-3-data">
+                        <div class="visibility-container">
+                            <p1 class="data-label">Enemy #3 visibility: </p1>
+                            <input type="checkbox" class="visibility"/>
+                        </div>
+        
+                        <p1 class="data-label">position: </p1>
+                        <input type="number" class="positionX" /> <input type="number" class="positionY" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<style>
+    #page-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        height: 90vh;
+        width: 90vw;
+
+        flex-direction: column;
+    }
+
+    #top-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        height: 100%;
+        width: 100%;
+    }
+
+    #bottom-container {
+        float: left;
+        clear: left;
+
+        width: 100%;
+        height: 20%
+    }
+
+    .environment-variable-holder {
+        margin-right: 2rem;
+    }
+
+    #environment-data {
+        display: flex;
+        flex-direction: row;
+    }
+
+    #canvases {
+        position: relative;
+
+        width: 70vw;
+        aspect-ratio: 16/8;
+    }
+
+    .image-canvas-data {
+        position: absolute;
+        top: 0;
+        left: 0;
+
+        width: 100%;
+        height: 100%;
+    }
+
+    #photos-list {
+        width: 4rem;
+        background-color: gray;
+        padding: 1rem;
+
+        margin-right: 1rem;
+        max-height: 40vh;
+        overflow: auto;
+    }
+
+    .environment-variable-data {
+        width: 12rem;
+        margin-bottom: 2rem;
+    }
+
+    .environment-variable-data .visibility-container {
+        display: block;
+    }
+
+    .environment-variable-data input:not(.visibility) {
+        width: 3rem;
+    }
+
+    .imageButton {
+        color: black;
+        background-color: greenyellow;
+        font-size: 2rem;
+
+        margin-bottom: 0.1rem;
+    }
+
+    #environment-data {
+        margin-left: 1rem;
+        width: 10rem;
+    }
+</style>
