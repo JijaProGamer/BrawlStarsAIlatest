@@ -24,6 +24,7 @@ class Environment {
 
         //this.ActorModel.makeModel(Resolution); // TODO: Uncomment
         this.EnvironmentModel.makeModel(Resolution);
+        this.EnvironmentModel.makeMobilenet();
     }
 
     async CreateWorld(Image, imageTensor){

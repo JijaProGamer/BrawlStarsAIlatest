@@ -33,21 +33,29 @@ class EnvironmentModel {
     this.Resolution = Resolution;
   }
 
+  async makeMobilenet(){
+    this.mobilenet = await tf.loadGraphModel(`https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1`, {fromTFHub: true});
+  }
+
   makeModel() {
     this.model = tf.sequential();
  
     this.model.add(tf.layers.depthwiseConv2d({ kernelSize: 21, filters: 32, depthMultiplier: 3, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling', inputShape: [this.Resolution[1], this.Resolution[0], 3] }));
     this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
-    this.model.add(tf.layers.depthwiseConv2d({ kernelSize: 15, filters: 64, depthMultiplier: 3, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling' }));
+    this.model.add(tf.layers.depthwiseConv2d({ kernelSize: 7, filters: 64, depthMultiplier: 3, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling' }));
     this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
-    this.model.add(tf.layers.depthwiseConv2d({ kernelSize: 9, filters: 64, depthMultiplier: 3, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling' }));
-    this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
+    this.model.add(tf.layers.depthwiseConv2d({ kernelSize: 3, filters: 64, depthMultiplier: 3, strides: 1, activation: 'relu', kernelInitializer: 'varianceScaling' }));
+    //this.model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
     this.model.add(tf.layers.flatten());
     this.model.add(tf.layers.dense({ units: 128, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
     this.model.add(tf.layers.dense({ units: PARAMETERS, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU'}));
 
-    //const optimizer = tf.train.sgd(0.02);
-    const optimizer = tf.train.adam(0.001); // 0.001 default for adam
+      /*this.model.add(tf.layers.dense({inputShape: [1024], units: 128, activation: 'LeakyReLU'}));
+    this.model.add(tf.layers.dense({ units: 512, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU', kernelRegularizer: tf.regularizers.l2() }))
+    this.model.add(tf.layers.dense({ units: PARAMETERS, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU'}));*/
+
+    const optimizer = tf.train.sgd(0.02);
+    //const optimizer = tf.train.adam(0.001); // 0.001 default for adam
     //const optimizer = tf.train.momentum(0.01, 0.9, true)
     this.model.compile({
       optimizer: optimizer,
