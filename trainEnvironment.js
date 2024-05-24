@@ -26,7 +26,7 @@ function combo(arr) {
 
     const result = [];
     const seen = new Set();
-    
+
     function permuteHelper(current, remaining) {
         if (remaining.length === 0) {
             const key = current.join('-');
@@ -42,7 +42,7 @@ function combo(arr) {
             }
         }
     }
-    
+
     permuteHelper([], arr);
     return result;
 };
@@ -54,16 +54,28 @@ function parseBMP(bmpBuffer) {
     const fileSize = header.readUInt32LE(2);
     const width = dibHeader.readUInt32LE(4);
     const height = dibHeader.readUInt32LE(8);
+    const bitsPerPixel = dibHeader.readUInt16LE(14);
     const pixelDataOffset = header.readUInt32LE(10);
 
+    const rowSize = Math.floor((bitsPerPixel * width + 31) / 32) * 4; // Each row is padded to the nearest 4-byte boundary
     const pixelData = bmpBuffer.slice(pixelDataOffset);
+
+    const invertedPixelData = Buffer.alloc(pixelData.length);
+
+    for (let row = 0; row < height; row++) {
+        const srcStart = row * rowSize;
+        const srcEnd = srcStart + rowSize;
+        const destStart = (height - row - 1) * rowSize;
+
+        pixelData.copy(invertedPixelData, destStart, srcStart, srcEnd);
+    }
 
     return {
         fileSize,
         width,
         height,
-        pixelData
-    }
+        pixelData: invertedPixelData
+    };
 }
 
 let environment = new Environment([296, 136])
@@ -172,10 +184,12 @@ function transcodeJsonFile(fileName) {
 
 async function prepareTrainingData(files) {
     let images = [];
+    let rawImages = [];
     let results = [];
 
     for (let fileName of files) {
         const image = await trascodeImageFile(fileName);
+        const bmpData = parseBMP(image)
 
         /*const preprocessedImage = tf.tensor(image, [environment.Resolution[1], environment.Resolution[0], 3])
             .div(tf.scalar(255))*/
@@ -187,6 +201,7 @@ async function prepareTrainingData(files) {
         for (let result of resultsLocal) {
             result = tf.tensor1d(result);
 
+            rawImages.push(bmpData)
             images.push(preprocessedImage);
             results.push(result);
         }
@@ -195,7 +210,7 @@ async function prepareTrainingData(files) {
     const xTrain = tf.stack(images);
     const yTrain = tf.stack(results);
 
-    return { xTrain, yTrain, images, results };
+    return { xTrain, yTrain, images, rawImages, results };
 }
 
 const ballRadius = 5
@@ -260,7 +275,20 @@ let files = fs.readdirSync(path.join(__dirname, "human_character_detection/train
     .filter((v) => v.includes(".png"))
     .map((v) => v.split(".png").shift())
 
-prepareTrainingData(files).then((trainingData) => {
+environment.init().then(async () => {
+    let trainingData = await prepareTrainingData(files)
+    let testIndex = 0
+
+    //await visualizePredictions(transcodeJsonFile(files[testIndex])[0], files[testIndex], path.join(__dirname, "tests", `testExpected${testIndex}.png`))
+
+    //let predictResult = await environment.EnvironmentModel.predict(trainingData.images[testIndex]);
+    //await visualizePredictions(predictResult.predictions, files[testIndex], path.join(__dirname, "tests", `testResult${testIndex}.png`));
+
+    for(let i = 0; i < 10; i++)
+        console.log((await environment.EnvironmentModel.predict(trainingData.images[testIndex])).duration);
+})
+
+/*prepareTrainingData(files).then(async (trainingData) => {
     environment.EnvironmentModel.train(trainingData.xTrain, trainingData.yTrain).then(async () => {
         await environment.EnvironmentModel.save(path.join(__dirname, "ai/environment"))
 
@@ -281,9 +309,10 @@ prepareTrainingData(files).then((trainingData) => {
 
             let predictResult = await environment.EnvironmentModel.predict(trainingData.images[testIndex].expandDims());
             await visualizePredictions(predictResult, files[testIndex], path.join(__dirname, "tests", `testResult${testIndex}.png`));
-        }*/
+        }/
     })
-})
+})*/
+
 
 /*environment.EnvironmentModel.load(path.join(__dirname, "ai/environment")).then(() => {
     prepareTrainingData(files).then((trainingData) => {
@@ -296,3 +325,4 @@ prepareTrainingData(files).then((trainingData) => {
         })
     })
 })*/
+

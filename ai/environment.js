@@ -27,6 +27,10 @@ class Environment {
         this.EnvironmentModel.makeMobilenet();
     }
 
+    async init(){
+        await this.EnvironmentModel.launchModel();
+    }
+
     async CreateWorld(Image, imageTensor){
         console.time("world prediction")
         let prediction = await this.EnvironmentModel.predict(imageTensor);
@@ -35,7 +39,7 @@ class Environment {
         this.SetWorld(prediction)
     }
 
-    async SetWorld(prediction){
+    /*async SetWorld(prediction){
         if(prediction[0] > 0){
             this.BallPosition = [prediction[1], prediction[2]]
         } else {
@@ -73,6 +77,50 @@ class Environment {
 
         for(let i = 0; i < 3; i++){
             setPlayer(this.Enemy[i])
+        }
+    }*/
+
+    async SetWorld(prediction){
+        let ball = prediction.filter((v) => v.label == "Ball")[0]
+        let me = prediction.filter((v) => v.label == "Me")[0]
+        let friendly = prediction.filter((v) => v.label == "Friendly")
+        let enemy = prediction.filter((v) => v.label == "Enemy")
+
+        if(ball){
+            this.BallPosition = [(ball.bbox[0] + ball.bbox[2]) / 2, (ball.bbox[1] + ball.bbox[3]) / 2]
+        } else {
+            this.BallPosition = [-1, -1]
+        }
+
+
+        function setPlayer(player, playerData){
+            if(playerData){
+                player.Position = [(playerData.bbox[0] + playerData.bbox[2]) / 2, (playerData.bbox[1] + playerData.bbox[3]) / 2];
+                //player.HasUltra = prediction[lastIndex + 3] > 0;
+                //player.HasHypercharge = prediction[lastIndex + 4] > 0;
+            } else {
+                //player.HasUltra = false;
+                //player.HasHypercharge = false;
+                player.Position = [-1, -1];
+                player.Health = 0;
+            }
+
+            //lastIndex += 5;
+        }
+
+        function setLocalPlayer(){
+
+        }
+
+        setPlayer(this.Actor, me)
+        setLocalPlayer()
+
+        for(let i = 0; i < 2; i++){
+            setPlayer(this.Friendly[i], friendly[i])
+        }
+
+        for(let i = 0; i < 3; i++){
+            setPlayer(this.Enemy[i], enemy[i])
         }
     }
 

@@ -59,7 +59,7 @@ function CalculatePlayerHealth(image, resolution, playerPosition){
 }
 
 function isMe(red, green, blue){
-    return false;//red < 100 && green > 150 && green < 200 && blue < 150 && blue > 0;
+    return false;red < 75 && green > 150 && green < 190 && blue < 150 && blue > 0;
 }
 
 function isTeammate(red, green, blue){
@@ -76,7 +76,7 @@ function isBall(red, green, blue){
     return false;
 }
 
-function FindCharacters(image, resolution){
+function RenderCharacters(image, resolution){
     for(let x = 0; x < resolution[0]; x++){
         for(let y = 0; y < resolution[1]; y++){
             let index = (x + resolution[0] * y) * 3;
@@ -112,9 +112,10 @@ function propagate(image, resolution){
                 let ugreen = 0;
                 let ublue = 0;
                 let fragments = 0;
+                let area = 1;
 
-                for(let xs = -3; xs <= 3; xs++){
-                    for(let ys = -3; ys <= 3; ys++){
+                for(let xs = -area; xs <= area; xs++){
+                    for(let ys = -area; ys <= area; ys++){
                         let xn = x + xs;
                         let yn = y + ys;
                         if(xn < 0 || yn < 0) continue;
@@ -151,6 +152,125 @@ function propagate(image, resolution){
     }
 
     return newImage
+}
+
+function FindCharacters(image, resolution){
+    let characters = []
+
+    for(let x = 0; x < resolution[0]; x++){
+        for(let y = 0; y < resolution[1]; y++){
+            let index = (x + resolution[0] * y) * 3;
+            let red = image[index];
+            let green = image[index + 1];
+            let blue = image[index + 2];
+
+            if(red == 0 && green == 0 && blue == 0){
+                let ured = 0;
+                let ugreen = 0;
+                let ublue = 0;
+
+                let fragments = 0;
+                let radius = 7;
+                let minradius = 6;
+                let circumference = 6//Math.round(2 * Math.PI * radius);
+
+                let pixelsGood = []
+
+                for(let xs = -radius; xs <= radius; xs++){
+                    for(let ys = -radius; ys <= radius; ys++){
+                        let xn = x + xs;
+                        let yn = y + ys;
+                        if(xn < 0 || yn < 0) continue;
+                        let dist = Math.sqrt(xs*xs + ys * ys);
+                        if(dist > radius || dist < minradius) continue;
+    
+                        let nindex = (xn + resolution[0] * yn) * 3;
+                        let nred = image[nindex];
+                        let ngreen = image[nindex + 1];
+                        let nblue = image[nindex + 2];
+    
+                        if(nred > 0 || ngreen > 0 || nblue > 0){
+                            ured += nred;
+                            ugreen += ngreen;
+                            ublue += nblue;
+
+                            fragments += 1;// / dist * 3;
+
+                            pixelsGood.push([xs/radius, ys/radius])
+                        }
+                    }
+                }
+
+                let distances = pixelsGood.reduce((partialSum, a) => partialSum + a[0] + a[1], 0);
+
+                if(fragments >= circumference && distances < 1){
+                    ured /= fragments;
+                    ugreen /= fragments;
+                    ublue /= fragments;
+
+                    let position = [x / resolution[0], y / resolution[1]];
+                    let shouldContinue = true;
+
+                    for(let character of characters){
+                        let dist = Math.sqrt(Math.pow(position[0] - character.position[0], 2) + Math.pow(position[1] - character.position[1], 2))
+                        if(dist < 0.1){
+                            shouldContinue = false;
+                            break;
+                        }
+                    }
+
+                    if(!shouldContinue) continue;
+
+                    if(isEnemy(ured, ugreen, ublue)){
+                        characters.push({
+                            type: "enemy",
+                            position: position
+                        });
+                    } else if(isTeammate(ured, ugreen, ublue)){
+                        characters.push({
+                            type: "friendly",
+                            position: position
+                        });
+                    } else if(isMe(ured, ugreen, ublue)){
+                        characters.push({
+                            type: "me",
+                            position: position
+                        });
+                    } else if(isBall(ured, ugreen, ublue)){
+                        characters.push({
+                            type: "ball",
+                            position: position
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    return characters
+}
+
+function DrawCharacters(image, resolution, characters){
+    for(let character of characters){
+        let sx = Math.round(character.position[0] * resolution[0]);
+        let sy = Math.round(character.position[1] * resolution[1]);
+        let radius = 7
+
+        for(let x = sx - radius; x < sx + radius; x++){
+            for(let y = sy - radius; y < sy + radius; y++){
+                if(Math.sqrt( (sx - x)*(sx - x) + (sy - y)*(sy - y) ) > radius) continue;
+    
+                let index = (x + resolution[0] * y) * 3;
+                let [r, g, b] = [image[index], image[index + 1], image[index + 2]]
+    
+                image[index] = 0;
+                image[index + 1] = 0;
+                image[index + 2] = 0;            
+            }
+        }    
+    }
+
+    return image;
 }
 
 const fs = require('fs');
@@ -239,7 +359,15 @@ let radius = 5
 
 //testImage.pixels = FindCharacters(testImage.pixels, testImage.resolution)
 
-testImage.pixels = FindCharacters(testImage.pixels, testImage.resolution)
-testImage.pixels = propagate(testImage.pixels, testImage.resolution)
+let initialPixels = [...testImage.pixels];
 
-saveImageToPPM("./testOutput.ppm", testImage.resolution, testImage.pixels)
+testImage.pixels = RenderCharacters(testImage.pixels, testImage.resolution)
+//testImage.pixels = propagate(testImage.pixels, testImage.resolution)
+
+let Characters = FindCharacters(testImage.pixels, testImage.resolution)
+console.log(Characters)
+
+//initialPixels = testImage.pixels;
+initialPixels = DrawCharacters(initialPixels, testImage.resolution, Characters)
+
+saveImageToPPM("./testOutput.ppm", testImage.resolution, initialPixels)

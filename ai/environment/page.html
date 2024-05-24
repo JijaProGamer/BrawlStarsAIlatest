@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TensorFlow.js with WebGL Example</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.7.4"></script>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const threshold = 0.75;
+
+        let classesDir = {
+            1: {
+                name: 'Kangaroo',
+                id: 1,
+            },
+            2: {
+                name: 'Other',
+                id: 2,
+            }
+        }
+
+        let model;
+        const socket = new WebSocket(`ws://localhost:${parseInt(location.port) + 1}`);
+
+        socket.addEventListener("open", (event) => {
+
+        });
+
+        socket.addEventListener("message", async (event) => {
+            if (!model) {
+                await getModel()
+            }
+
+            let start = performance.now();
+            let data = JSON.parse(event.data)
+
+            /*const imageData = createImageDataFromBMP(data);
+
+            document.querySelector("canvas").width = 296
+            document.querySelector("canvas").height = 136
+            document.querySelector("canvas").getContext("2d").putImageData(imageData, 0, 0)*/
+
+            tf.engine().startScope();
+
+            /*const imgTensor = tf.browser.fromPixels(imageData).toInt()
+                .transpose([0, 1, 2]).expandDims();*/
+
+            const image = tf.tensor(data.data, data.shape, "int32")
+
+            const imgTensor = image
+                .transpose([0, 1, 2]).expandDims()
+
+            model.executeAsync(imgTensor).then(predictions => {
+                predictions = getPredictions(predictions);
+
+                socket.send(JSON.stringify({ id: data.id, predictions }))
+
+                tf.engine().endScope();
+            });
+        });
+
+        async function getModel() {
+            await tf.setBackend('webgl');
+            await tf.ready();
+
+            model = await tf.loadGraphModel("https://raw.githubusercontent.com/hugozanini/TFJS-object-detection/master/models/kangaroo-detector/model.json");
+        }
+
+
+        function buildDetectedObjects(scores, threshold, boxes, classes) {
+            const detectionObjects = []
+
+            scores[0].forEach((score, i) => {
+                if (score > threshold) {
+                    const bbox = [];
+                    const minY = boxes[0][i][0];
+                    const minX = boxes[0][i][1];
+                    const maxY = boxes[0][i][2];
+                    const maxX = boxes[0][i][3];
+                    bbox[0] = minX;
+                    bbox[1] = minY;
+                    bbox[2] = maxX - minX;
+                    bbox[3] = maxY - minY;
+
+                    detectionObjects.push({
+                        class: classes[i],
+                        label: classesDir[classes[i]].name,
+                        score: score.toFixed(4),
+                        bbox: bbox
+                    })
+                }
+            })
+
+            return detectionObjects
+        }
+
+        function getPredictions(predictions) {
+            const boxes = predictions[4].arraySync();
+            const scores = predictions[5].arraySync();
+            const classes = predictions[6].dataSync();
+            const detections = buildDetectedObjects(scores, threshold, boxes, classes);
+
+            return detections
+        }
+    </script>
+
+    <style>
+        #canvas {
+            display: block;
+            width: 80vw;
+        }
+    </style>
+</body>
+
+</html>
