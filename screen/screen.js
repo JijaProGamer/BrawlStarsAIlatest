@@ -37,6 +37,55 @@ function spawnScreen(Resolution, Framerate, WindowTitle) {
     })
 }
 
+class CircularBuffer {
+    constructor(maxSize) {
+        this.buffer = Buffer.allocUnsafe(maxSize);
+        this.maxSize = maxSize;
+        this.start = 0;
+        this.end = 0;
+        this.length = 0;
+    }
+
+    write(data) {
+        const dataLength = data.length;
+        if (dataLength > this.maxSize) {
+            throw new Error('Data exceeds buffer size');
+        }
+
+        if (this.length + dataLength <= this.maxSize) {
+            data.copy(this.buffer, this.end);
+            this.end = (this.end + dataLength) % this.maxSize;
+            this.length += dataLength;
+        } else {
+            const remainingSpace = this.maxSize - this.length;
+            data.copy(this.buffer, this.end, 0, remainingSpace);
+            data.copy(this.buffer, 0, remainingSpace);
+            this.end = dataLength - remainingSpace;
+            this.length = this.maxSize;
+        }
+    }
+
+    read(chunkSize) {
+        if (chunkSize > this.length) {
+            chunkSize = this.length;
+        }
+
+        const output = Buffer.allocUnsafe(chunkSize);
+        if (this.start + chunkSize <= this.maxSize) {
+            this.buffer.copy(output, 0, this.start, this.start + chunkSize);
+        } else {
+            const endPartLength = this.maxSize - this.start;
+            this.buffer.copy(output, 0, this.start, this.maxSize);
+            this.buffer.copy(output, endPartLength, 0, chunkSize - endPartLength);
+        }
+
+        this.start = (this.start + chunkSize) % this.maxSize;
+        this.length -= chunkSize;
+        
+        return output;
+    }
+}
+
 
 function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
     onStart,
@@ -52,7 +101,7 @@ function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
         `-i`, `title=${WindowTitle}`, // screen title
         `-f`, `rawvideo`, // raw video data
         `-vcodec`, `rawvideo`, // raw video data
-        '-vf', 'format=rgba', // rgba pixel format (8 bis per channel, 32 bits (1 int) per pixel)
+        '-vf', `format=rgba,scale=${Resolution[0]}:${Resolution[1]}`, // rgba pixel format (8 bis per channel, 32 bits (1 int) per pixel)
         `-an`, // no sound
         `-draw_mouse`, `0`,
         `-` // pipe to stdout
@@ -76,74 +125,33 @@ function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
         }
     })
 
-    let bytesWritten = 0;
-    const imageBuffer = Buffer.allocUnsafe(Resolution[0] * Resolution[1] * 4);
+    const bufferCapacity = Resolution[0] * Resolution[1] * 4 * Framerate;
+    const buffer = new CircularBuffer(bufferCapacity);
 
     ffmpegProcess.stdout.on('data', (data) => {
-        const remainingBytes = imageBuffer.length - bytesWritten;
+        buffer.write(data);
 
-        if (remainingBytes >= data.length) {
-            data.copy(imageBuffer, bytesWritten);
-            bytesWritten += data.length;
-        } else {
-            data.copy(imageBuffer, bytesWritten, 0, remainingBytes);
-            onFrame(imageBuffer);
-
-            const remainingDataLength = data.length - remainingBytes;
-            data.copy(imageBuffer, 0, remainingBytes, remainingDataLength);
-
-            bytesWritten = remainingDataLength;
+        const chunkSize = Resolution[0] * Resolution[1] * 4;
+        while (buffer.length >= chunkSize) {
+            const frameData = buffer.read(chunkSize);
+            onFrame(frameData);
         }
     });
 }
-
-function parseRawVideoDataRG(data) {
-    const pixels = Array(data.length * 2/4);
-
-    for (let i = 0; i < data.length; i += 4) {
-        const red = data.readUInt8(i);
-        const blue = data.readUInt8(i + 2);
-
-        let index = i * 2/4;
-
-        pixels[index] = red;
-        pixels[index + 1] = blue;
-    }
-
-
-    return pixels;
-}
-
-function parseRawVideoDataRG(data) {
-    const pixels = Array(data.length * 2/4);
-
-    for (let i = 0; i < data.length; i += 4) {
-        const red = data.readUInt8(i);
-        const blue = data.readUInt8(i + 2);
-
-        let index = i * 2/4;
-
-        pixels[index] = red;
-        pixels[index + 1] = blue;
-    }
-
-
-    return pixels;
-}
-
 function parseRawVideoDataRGB(data) {
-    const pixels = Array(data.length * 3/4);
+    const pixels = Array(data.length * 3/4);//Array(data.length * 3/4);
 
+    let k = 0;
     for (let i = 0; i < data.length; i += 4) {
         const red = data.readUInt8(i);
         const green = data.readUInt8(i + 1);
         const blue = data.readUInt8(i + 2);
 
-        let index = i * 3/4;
+        pixels[k] = red;
+        pixels[k + 1] = green;
+        pixels[k + 2] = blue;
 
-        pixels[index] = red;
-        pixels[index + 1] = green;
-        pixels[index + 2] = blue;
+        k += 3;
     }
 
 
@@ -169,17 +177,11 @@ module.exports = function StartScreen(Resolution, Framerate, WindowTitle, onFram
             console.log(`recorder stopped with reason ${reason}`)
         }
 
-        let frameIndex = 0
+        /*let frameIndex = 0
         function onFrame(pixels) {
             frameIndex += 1;
-            let pixelsRG = parseRawVideoDataRG(pixels)
             let pixelsRGB = parseRawVideoDataRGB(pixels)
 
-            let ppmRG = `P3\n${Resolution[0]} ${Resolution[1]}\n255\n`;
-
-            for (let i = 0; i < pixelsRG.length; i += 2) {
-                ppmRG += `${pixelsRG[i]} 0 ${pixelsRG[i + 1]} `;
-            }
 
             let ppmRGB = `P3\n${Resolution[0]} ${Resolution[1]}\n255\n`;
 
@@ -187,14 +189,13 @@ module.exports = function StartScreen(Resolution, Framerate, WindowTitle, onFram
                 ppmRGB += `${pixelsRGB[i]} ${pixelsRGB[i + 1]} ${pixelsRGB[i + 2]} `;
             }
 
-            fs.writeFile(`./tmp/frame${frameIndex}RG.ppm`, ppmRG, "utf-8", () => { })
             fs.writeFile(`./tmp/frame${frameIndex}RGB.ppm`, ppmRGB, "utf-8", () => { })
-        }
+        }*/
 
         setTimeout(() => {
             recorder = spawnScreenRecorder(
                 Resolution, Framerate, WindowTitle, 
-                { onStart, onError, onClose, onFrame/*: (pixels) => onFrame(parseRawVideoDataRG(pixels))*/ }
+                { onStart, onError, onClose, onFrame: (pixels) => onFrame(parseRawVideoDataRGB(pixels)) }
             )
         }, 1000)
     })

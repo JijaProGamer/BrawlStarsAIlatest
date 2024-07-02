@@ -23,8 +23,6 @@ class Environment {
         this.EnvironmentModel = new environmentModel(Resolution)
 
         //this.ActorModel.makeModel(Resolution); // TODO: Uncomment
-        this.EnvironmentModel.makeModel(Resolution);
-        this.EnvironmentModel.makeMobilenet();
     }
 
     async init(){
@@ -32,11 +30,10 @@ class Environment {
     }
 
     async CreateWorld(Image, imageTensor){
-        console.time("world prediction")
-        let prediction = await this.EnvironmentModel.predict(imageTensor);
-        console.timeEnd("world prediction")
+        let prediction = await this.EnvironmentModel.predict(Image);
+        console.log(prediction)
 
-        this.SetWorld(prediction)
+        this.SetWorld(prediction.predictions)
     }
 
     /*async SetWorld(prediction){
@@ -81,13 +78,13 @@ class Environment {
     }*/
 
     async SetWorld(prediction){
-        let ball = prediction.filter((v) => v.label == "Ball")[0]
-        let me = prediction.filter((v) => v.label == "Me")[0]
-        let friendly = prediction.filter((v) => v.label == "Friendly")
-        let enemy = prediction.filter((v) => v.label == "Enemy")
+        let ball = prediction.filter((v) => v.class == "Ball")[0]
+        let me = prediction.filter((v) => v.class == "Me")[0]
+        let friendly = prediction.filter((v) => v.class == "Friendly")
+        let enemy = prediction.filter((v) => v.class == "Enemy")
 
         if(ball){
-            this.BallPosition = [(ball.bbox[0] + ball.bbox[2]) / 2, (ball.bbox[1] + ball.bbox[3]) / 2]
+            this.BallPosition = [(ball.x1 + ball.x2) / 2, (ball.y1 + ball.y2) / 2]
         } else {
             this.BallPosition = [-1, -1]
         }
@@ -95,7 +92,7 @@ class Environment {
 
         function setPlayer(player, playerData){
             if(playerData){
-                player.Position = [(playerData.bbox[0] + playerData.bbox[2]) / 2, (playerData.bbox[1] + playerData.bbox[3]) / 2];
+                player.Position = [(playerData.x1 + playerData.x2) / 2, (playerData.y1 + playerData.y2) / 2];
                 //player.HasUltra = prediction[lastIndex + 3] > 0;
                 //player.HasHypercharge = prediction[lastIndex + 4] > 0;
             } else {
@@ -177,16 +174,17 @@ class Environment {
     }
 
     async ProcessStep(Image){
-        let imageTensor = tf.tensor(Image, [this.Resolution[0], this.Resolution[1], 2])
-        .div(tf.scalar(255))
-        .expandDims();
+        let imageTensor = tf.tensor(Image, [this.Resolution[1], this.Resolution[0], 3])
+            .div(tf.scalar(255))
+            .expandDims();
+
 
         await this.CreateWorld(Image, imageTensor);
         //console.time("actor actions prediction")
-        let prediction = await this.ActorModel.act(imageTensor, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
+        //let prediction = await this.ActorModel.act(imageTensor, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
         //console.timeEnd("actor actions prediction")
 
-        this.SetActor(prediction)
+        //this.SetActor(prediction)
     }
 
     SetActor(prediction){

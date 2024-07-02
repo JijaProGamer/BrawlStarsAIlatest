@@ -78,7 +78,7 @@ function parseBMP(bmpBuffer) {
     };
 }
 
-let environment = new Environment([296, 136])
+let environment = new Environment([382, 172])
 
 function trascodeImageFile(file) {
     return new Promise((resolve, reject) => {

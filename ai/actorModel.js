@@ -28,27 +28,26 @@ class ActorModel {
   }
 
   makeModel() {
-    const imageInput = tf.input({ shape: [this.Resolution[0], this.Resolution[1], 2] });
-    const additionalDataInput = tf.input({ shape: [InputElements] });
+    const imageInput = tf.input({ shape: [this.Resolution[1], this.Resolution[0], 3], name: 'image_input' });
+    const additionalDataInput = tf.input({ shape: [InputElements], name: 'additional_data_input' });
 
-    const convLayer1 = tf.layers.conv2d({ kernelSize: 5, filters: 64, strides: 1, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling' });
-    const maxPoolLayer = tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] });
-    const convLayer2 = tf.layers.conv2d({ kernelSize: 3, filters: 32, strides: 1, activation: 'LeakyReLU', kernelInitializer: 'varianceScaling' });
+    // Convolutional layers for image input
+    const convLayer = tf.layers.conv2d({ filters: 32, kernelSize: 3, activation: 'relu' }).apply(imageInput);
+    const maxPoolLayer = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer);
+    const convLayer2 = tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu' }).apply(maxPoolLayer);
+    const maxPoolLayer2 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer2);
+    const flattenLayer = tf.layers.flatten().apply(maxPoolLayer2);
 
-    const flattenLayer = tf.layers.flatten();
-    const denseLayer1 = tf.layers.dense({ units: 256, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU' });
-    const denseLayer2 = tf.layers.dense({ units: 512, kernelInitializer: 'varianceScaling', activation: 'LeakyReLU' });
-    const outputLayer = tf.layers.dense({ units: OutputElements, kernelInitializer: 'varianceScaling', activation: 'tanh' });
+    // Dense layers for additional data input
+    const denseLayer1 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(additionalDataInput);
+    const denseLayer2 = tf.layers.dense({ units: 64, activation: 'relu' }).apply(denseLayer1);
 
-    const convOutput1 = convLayer1.apply(imageInput);
-    const maxPoolOutput = maxPoolLayer.apply(convOutput1);
-    const convOutput2 = convLayer2.apply(maxPoolOutput);
-    //const convOutput2 = convLayer2.apply(convOutput1);
+    // Concatenate both branches
+    const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer2]);
 
-    const mergedOutput = tf.layers.concatenate().apply([flattenLayer.apply(convOutput2), additionalDataInput]);
-    const denseOutput1 = denseLayer1.apply(mergedOutput);
-    const denseOutput2 = denseLayer2.apply(denseOutput1);
-    const output = outputLayer.apply(denseOutput2);
+    // Dense layers after concatenation
+    const denseLayer3 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(concatenated);
+    const output = tf.layers.dense({ units: OutputElements, activation: 'linear' }).apply(denseLayer3);
 
     const model = tf.model({ inputs: [imageInput, additionalDataInput], outputs: output });
 

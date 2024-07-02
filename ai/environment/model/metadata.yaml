@@ -1,0 +1,23 @@
+description: Ultralytics best model trained on /content/Brawl-Stars-Character-Detector-7/../data.yaml
+author: Ultralytics
+date: '2024-07-01T18:02:42.871299'
+version: 8.2.48
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 384
+- 384
+names:
+  0: Ball
+  1: Enemy
+  2: Friendly
+  3: Gem
+  4: Hot_Zone
+  5: Me
+  6: PP
+  7: PP_Box
+  8: Safe_Enemy
+  9: Safe_Friendly

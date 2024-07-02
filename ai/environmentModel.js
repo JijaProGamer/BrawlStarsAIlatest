@@ -43,8 +43,10 @@ class EnvironmentModel {
     this.Resolution = Resolution;
   }
 
-  async makeMobilenet(){
-    this.mobilenet = await tf.loadGraphModel(`https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1`, {fromTFHub: true});
+  async warmup(){
+    for (let i = 0; i < 3; i++){
+      await this.predict(new Array(this.Resolution[0]*this.Resolution[1]*3));
+    }
   }
 
   launchModel(){
@@ -59,16 +61,25 @@ class EnvironmentModel {
       this.expressServer.get('/', (req, res) => {
           res.sendFile(path.join(__dirname, '/environment/page.html'));
       });
+
+      this.expressServer.get('/model.json', (req, res) => {
+          res.sendFile(path.join(__dirname, '/environment/model/model.json'));
+      });
+
+      this.expressServer.get('/:name.bin', (req, res) => {
+        const name = req.params.name;
+        res.sendFile(path.join(__dirname, `/environment/model/${name}.bin`));
+      });
   
       this.expressServer.listen(port, () => {
-          console.log(`Environment GPU ML Model is running at http://localhost:${port}, and WS at ws://localhost:${port + 1}`);
+          //console.log(`Environment GPU ML Model is running at http://localhost:${port}, and WS at ws://localhost:${port + 1}`);
       });
   
       this.webSocketServer.on('connection', (ws) => {
         this.websocket = ws;
   
         this.websocket.on('error', console.error);
-        resolve()
+        this.warmup().then(resolve)
       });
   
       this.browser = await puppeteer.launch({
@@ -88,9 +99,9 @@ class EnvironmentModel {
 
   predict(image) {
     return new Promise((resolve, reject) => {      
-      let messageId = uuid.v4()
-      let begin = performance.now()
-      let websocket = this.websocket
+      let messageId = uuid.v4();
+      let begin = performance.now();
+      const websocket = this.websocket;
 
       function onMessage(message){
         message = JSON.parse(message)
@@ -102,8 +113,8 @@ class EnvironmentModel {
       }
 
 
-      this.websocket.on("message", onMessage);
-      this.websocket.send(JSON.stringify({id: messageId, shape: image.shape, data: Object.values(image.dataSync())}));
+      websocket.on("message", onMessage);
+      websocket.send(JSON.stringify({id: messageId, resolution: this.Resolution, image}));
     })
   }
 }

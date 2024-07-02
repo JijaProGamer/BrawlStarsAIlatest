@@ -3,19 +3,20 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@hurdlegroup/robotjs": "^0.11.7",
     "@tensorflow/tfjs": "^4.19.0",
     "@tensorflow/tfjs-node": "^4.19.0",
-    "canvas": "^2.11.2",
+    "chalk": "^4.1.2",
     "express": "^4.19.2",
+    "node-abi": "^3.65.0",
     "puppeteer": "^22.9.0",
-    "robotjs": "^0.6.0",
     "uuid": "^9.0.1",
     "ws": "^8.17.0",
     "xmlbuilder2": "^3.1.1",
@@ -23,5 +24,10 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "devDependencies": {
+    "electron": "^31.1.0",
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9"
   }
 }

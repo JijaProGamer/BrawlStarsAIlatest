@@ -5,28 +5,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TensorFlow.js with WebGL Example</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.7.4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.1.0"></script>
 </head>
 
 <body>
     <canvas id="canvas"></canvas>
 
-    <script>
+    <script>        
         const threshold = 0.75;
 
-        let classesDir = {
-            1: {
-                name: 'Kangaroo',
-                id: 1,
-            },
-            2: {
-                name: 'Other',
-                id: 2,
-            }
-        }
+        let labels = [
+            "Ball",
+            "Enemy",
+            "Friendly",
+            "Gem",
+            "Hot_Zone",
+            "Me",
+            "PP",
+            "PP_Box",
+            "Safe_Enemy",
+            "Safe_Friendly"
+        ]
 
         let model;
         const socket = new WebSocket(`ws://localhost:${parseInt(location.port) + 1}`);
+        const canvas = document.querySelector("canvas");
+        const context = canvas.getContext("2d", {willReadFrequently: true, desynchronized: true})
 
         socket.addEventListener("open", (event) => {
 
@@ -34,79 +38,127 @@
 
         socket.addEventListener("message", async (event) => {
             if (!model) {
-                await getModel()
+                await getModel();
             }
 
-            let start = performance.now();
-            let data = JSON.parse(event.data)
+            let data = JSON.parse(event.data);
 
-            /*const imageData = createImageDataFromBMP(data);
+            data.resolution[1] = data.resolution[0]; // remove after retrain
 
-            document.querySelector("canvas").width = 296
-            document.querySelector("canvas").height = 136
-            document.querySelector("canvas").getContext("2d").putImageData(imageData, 0, 0)*/
+            const imageData = createImageDataFromRGBArray(data.image, data.resolution);
 
-            tf.engine().startScope();
+            canvas.width = data.resolution[0];
+            canvas.height = data.resolution[1];
+            context.putImageData(imageData, 0, 0);
 
-            /*const imgTensor = tf.browser.fromPixels(imageData).toInt()
-                .transpose([0, 1, 2]).expandDims();*/
+            // resize the frame
 
-            const image = tf.tensor(data.data, data.shape, "int32")
+            let xRatio, yRatio
 
-            const imgTensor = image
-                .transpose([0, 1, 2]).expandDims()
+            const [boxes, scores, classes] = tf.tidy(() => {
+                const maxSize = Math.max(data.resolution[0], data.resolution[1]);
+                const img = tf.browser.fromPixels(context.getImageData(0, 0, data.resolution[0], data.resolution[0]))
+                const imgPadded = img.pad([
+                    [0, maxSize - data.resolution[1]],
+                    [0, maxSize - data.resolution[0]],
+                    [0, 0],
+                ]);
 
-            model.executeAsync(imgTensor).then(predictions => {
-                predictions = getPredictions(predictions);
+                xRatio = maxSize / data.resolution[0];
+                yRatio = maxSize / data.resolution[1];
 
-                socket.send(JSON.stringify({ id: data.id, predictions }))
+                const imgTensor = tf.image
+                    .resizeBilinear(imgPadded, [data.resolution[0], data.resolution[1]])
+                    .div(255.0)
+                    .expandDims(0);
 
-                tf.engine().endScope();
-            });
+
+                // execute model
+
+                const res = model.execute(imgTensor);
+
+
+                const transRes = res.transpose([0, 2, 1]);
+                const boxes = tf.tidy(() => {
+                    const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
+                    const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
+                    const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2));
+                    const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2));
+                    return tf
+                        .concat(
+                            [
+                                y1,
+                                x1,
+                                tf.add(y1, h),
+                                tf.add(x1, w),
+                            ],
+                            2
+                        )
+                        .squeeze();
+                });
+
+                const [scores, classes] = tf.tidy(() => {
+                    const rawScores = transRes.slice([0, 0, 4], [-1, -1, labels.length]).squeeze(0);
+                    return [rawScores.max(1), rawScores.argMax(1)];
+                });
+                
+                return [boxes, scores, classes]
+            })
+
+            const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2);
+
+            const boxes_data = boxes.gather(nms, 0).dataSync();
+            const scores_data = scores.gather(nms, 0).dataSync();
+            const classes_data = classes.gather(nms, 0).dataSync();
+
+            tf.dispose([nms, boxes, scores, classes])
+
+            const predictions = convertPredictions(boxes_data, scores_data, classes_data, [xRatio, yRatio], data.resolution);
+            socket.send(JSON.stringify({ id: data.id, predictions: predictions }));
         });
+
+        function createImageDataFromRGBArray(rgbArray, resolution) {
+            const [width, height] = resolution;
+            const rgbaArray = new Uint8ClampedArray(width * height * 4);
+
+            for (let i = 0, j = 0; i < rgbArray.length; i += 3, j += 4) {
+                rgbaArray[j] = rgbArray[i];
+                rgbaArray[j + 1] = rgbArray[i + 1];
+                rgbaArray[j + 2] = rgbArray[i + 2];
+                rgbaArray[j + 3] = 255;
+            }
+
+            return new ImageData(rgbaArray, width, height);
+        }
 
         async function getModel() {
             await tf.setBackend('webgl');
             await tf.ready();
 
-            model = await tf.loadGraphModel("https://raw.githubusercontent.com/hugozanini/TFJS-object-detection/master/models/kangaroo-detector/model.json");
+            model = await tf.loadGraphModel("/model.json");
         }
 
 
-        function buildDetectedObjects(scores, threshold, boxes, classes) {
-            const detectionObjects = []
+        function convertPredictions(boxes_data, scores_data, classes_data, ratios, resolution) {
+            const predictions = []
 
-            scores[0].forEach((score, i) => {
-                if (score > threshold) {
-                    const bbox = [];
-                    const minY = boxes[0][i][0];
-                    const minX = boxes[0][i][1];
-                    const maxY = boxes[0][i][2];
-                    const maxX = boxes[0][i][3];
-                    bbox[0] = minX;
-                    bbox[1] = minY;
-                    bbox[2] = maxX - minX;
-                    bbox[3] = maxY - minY;
+            for (let i = 0; i < scores_data.length; ++i) {
+                const klass = labels[classes_data[i]];
+                const score = (scores_data[i] * 100).toFixed(1);
 
-                    detectionObjects.push({
-                        class: classes[i],
-                        label: classesDir[classes[i]].name,
-                        score: score.toFixed(4),
-                        bbox: bbox
-                    })
-                }
-            })
+                let [y1, x1, y2, x2] = boxes_data.slice(i * 4, (i + 1) * 4);
 
-            return detectionObjects
-        }
+                predictions.push({
+                    class: klass,
+                    score,
+                    x1: x1 * ratios[0] / resolution[0],
+                    x2: x2 * ratios[0] / resolution[0],
+                    y1: y1 * ratios[1] / resolution[1],
+                    y2: y2 * ratios[1] / resolution[1],
+                })
+            }
 
-        function getPredictions(predictions) {
-            const boxes = predictions[4].arraySync();
-            const scores = predictions[5].arraySync();
-            const classes = predictions[6].dataSync();
-            const detections = buildDetectedObjects(scores, threshold, boxes, classes);
-
-            return detections
+            return predictions
         }
     </script>
 
