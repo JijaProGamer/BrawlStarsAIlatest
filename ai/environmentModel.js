@@ -1,9 +1,3 @@
-const tf = require("@tensorflow/tfjs-node")
-
-const PARAMETERS_PER_PLAYER = 1 + 2;// + 2;
-const PARAMETERS_PER_BALL = 1 + 2;
-const PARAMETERS = PARAMETERS_PER_BALL + 6 * PARAMETERS_PER_PLAYER;
-
 const puppeteer = require("puppeteer")
 const express = require('express');
 const path = require("path")
@@ -11,7 +5,7 @@ const uuid = require("uuid")
 const { WebSocketServer } = require('ws');
 
 
-const port = 3000;
+const port = 7850;
 
 
 /*function environmentVariableLoss(trueData, predictedData){

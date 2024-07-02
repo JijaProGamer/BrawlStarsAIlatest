@@ -1,4 +1,4 @@
-const robot = require("robotjs");
+const robot = require("@hurdlegroup/robotjs");
 
 robot.setKeyboardDelay(0)
 robot.setMouseDelay(0)

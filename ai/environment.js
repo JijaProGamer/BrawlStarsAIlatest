@@ -1,4 +1,3 @@
-const tf = require("@tensorflow/tfjs-node")
 const { Actor, Player } = require("./actor");
 const actorModel = require("./actorModel.js")
 const environmentModel = require("./environmentModel.js")
@@ -30,10 +29,10 @@ class Environment {
     }
 
     async CreateWorld(Image, imageTensor){
-        let prediction = await this.EnvironmentModel.predict(Image);
-        console.log(prediction)
+        let environmentResult = await this.EnvironmentModel.predict(Image);
+        this.SetWorld(environmentResult.predictions)
 
-        this.SetWorld(prediction.predictions)
+        return [ environmentResult ]
     }
 
     /*async SetWorld(prediction){
@@ -174,17 +173,14 @@ class Environment {
     }
 
     async ProcessStep(Image){
-        let imageTensor = tf.tensor(Image, [this.Resolution[1], this.Resolution[0], 3])
-            .div(tf.scalar(255))
-            .expandDims();
-
-
-        await this.CreateWorld(Image, imageTensor);
+        const [ environmentResult ] = await this.CreateWorld(Image);
         //console.time("actor actions prediction")
         //let prediction = await this.ActorModel.act(imageTensor, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
         //console.timeEnd("actor actions prediction")
 
         //this.SetActor(prediction)
+
+        return [ environmentResult, Image ];
     }
 
     SetActor(prediction){

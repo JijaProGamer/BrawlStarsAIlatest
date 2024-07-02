@@ -1,24 +1,38 @@
-const { app, BrowserWindow } = require('electron');
-
-const { Environment } = require("./ai/environment.js")
-
-const StartScreen = require("./screen/screen.js")
-const uuid = require("uuid")
-
-const chalk = require('chalk');
-
 process.setMaxListeners(0);
 
+const { app, BrowserWindow, ipcMain } = require('electron');
+const { Environment } = require("./ai/environment.js")
+const StartScreen = require("./screen/screen.js")
+const uuid = require("uuid")
+const chalk = require('chalk');
+const path = require("path")
+const express = require("express")
+
+const server_port = 7830;
+const server = express();
+
+server.use(express.urlencoded({ extended: true }));
+server.use(express.json());
+
+let window;
+
 function createWindow() {
-    const win = new BrowserWindow({
-        width: 800,
-        height: 600,
+    window = new BrowserWindow({
+        autoHideMenuBar: true,
+        icon: path.join(__dirname, '/app/icon.ico'),
+        title: "Brawl Stars AI",
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'app/preload.js'),
+            nodeIntegration: true,
+            enableRemoteModule: false,
+            contextIsolation: true,
         }
     })
 
-    win.loadFile('index.html')
+    window.maximize();
+    window.loadURL(`http://127.0.0.1:${server_port}/`)
+
+    Run();
 }
 
 app.whenReady().then(() => {
@@ -36,6 +50,26 @@ app.on('window-all-closed', () => {
         app.quit()
     }
 })
+
+
+
+/*ipcMain.on('request-data', (event) => {
+    const data = { message: 'Hello from Node.js!' };
+    event.sender.send('response-data', data);
+});*/
+
+
+
+server.use(express.static(path.join(__dirname, '/app/public')));
+server.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '/app/public/index.html'));
+});
+
+server.get('/build/:file', (req, res) => {
+    res.sendFile(path.join(__dirname, '/app/public/build', req.params.file));
+});
+
+server.listen(server_port)
 
 /*const botTitleString = `
     ░▒▓███████▓▒░ ░▒▓███████▓▒░       ░▒▓██████▓▒░░▒▓█▓▒░ 
@@ -113,9 +147,7 @@ process.stdin.on("data", (stdin) => {
     }
 });*/
 
-
-
-/*let windowTitle = `brawlAI-screen-`
+let windowTitle = `brawlAI-screen-`
 let Resolution = [384, 172]
 let framerate = 10
 
@@ -127,9 +159,12 @@ const LocalEnvironment = new Environment(Resolution)
 let lastFrameEnded = true
 async function OnFrame(frameData){
     if(!lastFrameEnded) return;
-
     lastFrameEnded = false;
-    await LocalEnvironment.ProcessStep(frameData);
+
+
+    const [ environmentResult, Image ] = await LocalEnvironment.ProcessStep(frameData);
+    window.webContents.send("environment-detections", [ environmentResult, Image ]);
+
     lastFrameEnded = true;
 }
 
@@ -138,5 +173,3 @@ async function Run(){
     ;[screenProcess, ffmpegProcess] = await StartScreen(Resolution, framerate, `${windowTitle}-${uuid.v4()}`, OnFrame);
 
 }
-
-Run()*/
