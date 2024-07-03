@@ -1,0 +1,15 @@
+{
+    "labels": [
+        "Ball",
+        "Enemy",
+        "Friendly",
+        "Gem",
+        "Hot_Zone",
+        "Me",
+        "PP",
+        "PP_Box",
+        "Safe_Enemy",
+        "Safe_Friendly"
+    ],
+    "model_size": 256
+}

@@ -4,33 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TensorFlow.js with WebGL Example</title>
+    <title>Environment Model</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.1.0"></script>
 </head>
 
 <body>
-    <canvas id="canvas"></canvas>
-
     <script>        
-        const threshold = 0.75;
-
-        let labels = [
-            "Ball",
-            "Enemy",
-            "Friendly",
-            "Gem",
-            "Hot_Zone",
-            "Me",
-            "PP",
-            "PP_Box",
-            "Safe_Enemy",
-            "Safe_Friendly"
-        ]
+        let constants;
+        let labels;
+        let model_size;
 
         let model;
         const socket = new WebSocket(`ws://localhost:${parseInt(location.port) + 1}`);
-        const canvas = document.querySelector("canvas");
-        const context = canvas.getContext("2d", {willReadFrequently: true, desynchronized: true})
 
         socket.addEventListener("open", (event) => {
 
@@ -43,40 +28,22 @@
 
             let data = JSON.parse(event.data);
 
-            data.resolution[1] = data.resolution[0]; // remove after retrain
-
             const imageData = createImageDataFromRGBArray(data.image, data.resolution);
 
-            canvas.width = data.resolution[0];
-            canvas.height = data.resolution[1];
-            context.putImageData(imageData, 0, 0);
-
-            // resize the frame
-
-            let xRatio, yRatio
+            let xRatio, yRatio;
 
             const [boxes, scores, classes] = tf.tidy(() => {
                 const maxSize = Math.max(data.resolution[0], data.resolution[1]);
-                const img = tf.browser.fromPixels(context.getImageData(0, 0, data.resolution[0], data.resolution[0]))
-                const imgPadded = img.pad([
-                    [0, maxSize - data.resolution[1]],
-                    [0, maxSize - data.resolution[0]],
-                    [0, 0],
-                ]);
-
                 xRatio = maxSize / data.resolution[0];
                 yRatio = maxSize / data.resolution[1];
 
-                const imgTensor = tf.image
-                    .resizeBilinear(imgPadded, [data.resolution[0], data.resolution[1]])
-                    .div(255.0)
-                    .expandDims(0);
-
+                const imgTensor = tf.image.resizeBilinear(tf.browser.fromPixels(imageData), [model_size, model_size])
+                                .div(255.0)
+                                .expandDims(0);
 
                 // execute model
 
                 const res = model.execute(imgTensor);
-
 
                 const transRes = res.transpose([0, 2, 1]);
                 const boxes = tf.tidy(() => {
@@ -105,7 +72,7 @@
                 return [boxes, scores, classes]
             })
 
-            const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2);
+            const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 30, 0.45, 0.2);
 
             const boxes_data = boxes.gather(nms, 0).dataSync();
             const scores_data = scores.gather(nms, 0).dataSync();
@@ -136,6 +103,10 @@
             await tf.ready();
 
             model = await tf.loadGraphModel("/model.json");
+            constants = await (await fetch("/constants.json")).json();
+
+            labels = constants.labels;
+            model_size = constants.model_size;
         }
 
 
@@ -151,10 +122,10 @@
                 predictions.push({
                     class: klass,
                     score,
-                    x1: x1 * ratios[0] / resolution[0],
-                    x2: x2 * ratios[0] / resolution[0],
-                    y1: y1 * ratios[1] / resolution[1],
-                    y2: y2 * ratios[1] / resolution[1],
+                    x1: x1 / ratios[0] / resolution[0],
+                    x2: x2 / ratios[0] / resolution[0],
+                    y1: y1 / ratios[1] / resolution[1],
+                    y2: y2 / ratios[1] / resolution[1],
                 })
             }
 

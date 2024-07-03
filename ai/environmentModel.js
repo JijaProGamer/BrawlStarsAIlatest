@@ -60,6 +60,10 @@ class EnvironmentModel {
           res.sendFile(path.join(__dirname, '/environment/model/model.json'));
       });
 
+      this.expressServer.get('/constants.json', (req, res) => {
+        res.sendFile(path.join(__dirname, '/environment/constants.json'));
+    });
+
       this.expressServer.get('/:name.bin', (req, res) => {
         const name = req.params.name;
         res.sendFile(path.join(__dirname, `/environment/model/${name}.bin`));
@@ -77,10 +81,11 @@ class EnvironmentModel {
       });
   
       this.browser = await puppeteer.launch({
-        headless: true,
+        headless: false,
         args: [
           "--no-sandbox",
-          "--use-angle=default"
+          "--use-angle=default",
+          //'--use-gl=egl'
         ]
       })
   

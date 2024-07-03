@@ -148,13 +148,17 @@ process.stdin.on("data", (stdin) => {
 });*/
 
 let windowTitle = `brawlAI-screen-`
-let Resolution = [384, 172]
-let framerate = 10
+let scoreThreshold = {
+    iouThreshold: 0.5,
+    scorescoreThreshold: 0.5
+}
+let Resolution = [256, 128]
+let framerate = 15
 
 let screenProcess
 let ffmpegProcess
 
-const LocalEnvironment = new Environment(Resolution)
+const LocalEnvironment = new Environment({Resolution, scoreThreshold })
 
 let lastFrameEnded = true
 async function OnFrame(frameData){
@@ -171,5 +175,4 @@ async function OnFrame(frameData){
 async function Run(){
     await LocalEnvironment.init()
     ;[screenProcess, ffmpegProcess] = await StartScreen(Resolution, framerate, `${windowTitle}-${uuid.v4()}`, OnFrame);
-
 }

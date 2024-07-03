@@ -5,8 +5,8 @@ function spawnScreen(Resolution, Framerate, WindowTitle) {
     return new Promise((resolve, reject) => {
         let screenProcess = child_process.spawn(`scrcpy`, [
             `--no-audio`, // disable audio
-            `--max-size=${Resolution[0]}`, // set resolution
-            `--video-bit-rate=2000K`, // max 2 megabits per second
+            //`--max-size=${Resolution[0]}`, // set resolution
+            `--video-bit-rate=8000K`, // max 5 megabits per second
             `--max-fps=${Framerate * 2}`, // set fps
             `--video-codec=h264`, // set codec (h264/h265)
             //`--display-buffer=${Math.ceil(1000/Framerate)}`, // set display buffer to remove tearing
@@ -20,9 +20,11 @@ function spawnScreen(Resolution, Framerate, WindowTitle) {
             `--window-borderless`, // remove borders
             `--window-x=0`, `--window-y=0`, // set position to 0
             `--render-driver=software`, // render using CPU instead of GPU (for recording)
+            //`--render-driver=opengl`, // render using GPU instead of CPU (for anti aliasing)
         ])
 
         screenProcess.stderr.on("data", (data) => {
+            console.log(data.toString())
             if (data.toString().includes("ERROR: ")) {
                 screenProcess.kill()
                 reject(data.toString())
@@ -95,13 +97,13 @@ function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
 }) {
     let ffmpegProcess = child_process.spawn(`ffmpeg`, [
         //`-re`, // force input to be framerate consistent
+        `-hwaccel`, `d3d11va`,
         `-draw_mouse`, `0`,
         `-f`, `gdigrab`, // app record mode
         `-framerate`, `${Framerate}`, // framerate
         `-i`, `title=${WindowTitle}`, // screen title
         `-f`, `rawvideo`, // raw video data
-        `-vcodec`, `rawvideo`, // raw video data
-        '-vf', `format=rgba,scale=${Resolution[0]}:${Resolution[1]}`, // rgba pixel format (8 bis per channel, 32 bits (1 int) per pixel)
+        '-vf', `format=rgba,scale=${Resolution[0]}:${Resolution[1]}:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp`,
         `-an`, // no sound
         `-draw_mouse`, `0`,
         `-` // pipe to stdout
@@ -111,7 +113,7 @@ function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
 
     ffmpegProcess.stderr.on("data", (data) => {
         data = data.toString()
-        //console.log(data)
+        console.log(data)
 
         if (!started && data.includes("frame=")) {
             started = true;
@@ -147,9 +149,9 @@ function parseRawVideoDataRGB(data) {
         const green = data.readUInt8(i + 1);
         const blue = data.readUInt8(i + 2);
 
-        pixels[k] = red;
-        pixels[k + 1] = green;
-        pixels[k + 2] = blue;
+        pixels[k] = Math.floor(red / 1.15);
+        pixels[k + 1] = Math.floor(green / 1.15);
+        pixels[k + 2] = Math.floor(blue / 1.15);
 
         k += 3;
     }

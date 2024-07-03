@@ -1,34 +1,78 @@
 <script>
 	import { onMount } from "svelte";
 
-	onMount(() => {
-		const canvas = document.querySelector("canvas");
-		const context = canvas.getContext("2d");
+	export let lastInferencetime = 0;
+	export let lastFrametime = 0;
 
-		const options = { resolution: [384, 172] };
+	onMount(() => {
+		const canvas = document.querySelector("canvas.fake");
+		const canvasMain = document.querySelector("canvas.main");
+		const context = canvas.getContext("2d");
+		const contextMain = canvasMain.getContext("2d");
+
+		const options = { resolution: [256, 128] };
+
+
+
+		const labelColors = {
+			"Ball": "#e39309",
+            "Enemy": "#ed310c",
+            "Friendly": "#0cb5ed",
+            "Gem": "#d606c8",
+            "Hot_Zone": "#fce300",
+            "Me": "#59ed09",
+            "PP": "#155419",
+            "PP_Box": "#5c3d1a",
+            "Safe_Enemy": "#0004ff",
+            "Safe_Friendly": "#0fa6d4",
+		}
 
 		window.electron.on_environment_detections(
 			([environmentResult, Image]) => {
+				lastInferencetime = environmentResult.duration.toFixed();
+				lastFrametime = lastInferencetime;
+
 				const imageData = createImageDataFromRGBArray(Image, options.resolution);
 
 				canvas.width = options.resolution[0];
 				canvas.height = options.resolution[1];
-				context.putImageData(imageData, 0, 0);
+				canvasMain.width = options.resolution[0] * 5;
+				canvasMain.height = options.resolution[1] * 5;
+
+				context.putImageData(imageData, 0, 0, 0, 0, canvas.width, canvas.height);
+				contextMain.drawImage(canvas, 0, 0, options.resolution[0], options.resolution[1], 0, 0, canvasMain.width, canvasMain.height);
+
+				const currentPlayer = environmentResult.predictions.find((prediction) => prediction.class = "Me");
 
 				for(let environmentData of environmentResult.predictions){
-					renderEnvironmentData(environmentData)
+					renderEnvironmentData(environmentData, currentPlayer)
 				}
 			},
 		);
 
-		function renderEnvironmentData(data){
-			const x1 = data.x1 * options.resolution[0];
-			const x2 = data.x2 * options.resolution[0];
-			const y1 = data.y1 * options.resolution[1];
-			const y2 = data.y2 * options.resolution[1];
+		function renderEnvironmentData(data, currentPlayer){
+			const x1 = data.x1 * canvasMain.width;
+			const x2 = data.x2 * canvasMain.width;
+			const y1 = data.y1 * canvasMain.height;
+			const y2 = data.y2 * canvasMain.height;
 
-			context.strokeStyle = "green";
-			context.strokeRect(x1, x2 - x1, y1, y2 - y1);
+			// draw bounding box
+			contextMain.lineWidth = 4
+			contextMain.strokeStyle = labelColors[data.class];
+			contextMain.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+			// draw class
+			contextMain.font = `32px bold Arial`
+			contextMain.fillStyle = labelColors[data.class];
+			contextMain.fillText(`${data.class} - ${data.score}`, x2 + 10, y1 - 20);
+
+			// make line to current player
+			//if(!(data.class == "Friendly" || data.class == "Enemy") || !currentPlayer) return;
+			if(!currentPlayer) return;
+			contextMain.beginPath();
+			contextMain.moveTo((currentPlayer.x1 + currentPlayer.x2) / 2 * canvasMain.width, (currentPlayer.y1 + currentPlayer.y2) / 2 * canvasMain.height);
+			contextMain.lineTo((x1 + x2) / 2, (y1 + y2) / 2);
+			contextMain.stroke();
 		}
 
 		function createImageDataFromRGBArray(rgbArray, resolution) {
@@ -50,9 +94,15 @@
 </script>
 
 <main>
-	<canvas width="384px" height="172px"
+	<!--<canvas width="384px" height="172px"
 		>Your OS doesn't support canvases, how do you even run this app?</canvas
-	>
+	>-->
+
+	<canvas class="fake">Your OS doesn't support canvases, how do you even run this app?</canvas>
+	<canvas class="main">Your OS doesn't support canvases, how do you even run this app?</canvas>
+
+	<p class="frameTime">Last inference time: {lastInferencetime}ms</p>
+	<p class="frameTime">Last frame time: {lastFrametime}ms</p>
 </main>
 
 <style>
@@ -63,5 +113,14 @@
 	canvas {
 		width: 80%;
 		aspect-ratio: 16/7.75;
+	}
+
+	.fake {
+		display: none;
+	}
+
+	.frameTime {
+		color: white;
+		text-size-adjust:  1.5rem;
 	}
 </style>
