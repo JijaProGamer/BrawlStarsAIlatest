@@ -1,3 +1,5 @@
+const systeminformation = require('systeminformation'); 
+
 const { MouseControlType, KeyboardControlType, ButtonColtrolType } = require("../control/control.js")
 
 class Player {
@@ -10,10 +12,10 @@ class Player {
 }
 
 let MoveController = new KeyboardControlType(["w", "s", "a", "d", "wa", "wd", "sa", "sd"])
-let ShootController = new MouseControlType(13, [249, 118]);
-let UltraController = new MouseControlType(13, [279, 121]);
-let GadgetController = new ButtonColtrolType("z");
-let HyperchargeController = new ButtonColtrolType("x");
+let ShootController = new MouseControlType(0.039, [0.898, 0.736]);
+let UltraController = new MouseControlType(0.0375, [0.785, 0.819]);
+let GadgetController = new ButtonColtrolType("f");
+let HyperchargeController = new ButtonColtrolType("q");
 
 class Actor extends Player {
     MoveDirection = [0, 0]
@@ -28,6 +30,14 @@ class Actor extends Player {
     HasGadget = false
     Gadgets = 0
     Shoots = 0
+
+    async init(screenUsed){
+        const graphicsInfo = await systeminformation.graphics();
+        const screenInfo = graphicsInfo.displays[screenUsed];
+
+        ShootController.screenSize = UltraController.screenSize = [screenInfo.currentResX, screenInfo.currentResY];
+        ShootController.screenPosition = UltraController.screenPosition  = [screenInfo.positionX, screenInfo.positionY];
+    }
 
     ApplyInputs(){
         MoveController.move(this.MoveDirection);

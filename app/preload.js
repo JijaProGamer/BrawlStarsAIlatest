@@ -12,5 +12,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electron', {
     on_environment_detections: (func) => {
         ipcRenderer.on("environment-detections", (_, ...args) => func(...args));
+    },
+    on_settings: (func) => {
+        ipcRenderer.on("settings", (_, ...args) => func(...args));
     }
 });

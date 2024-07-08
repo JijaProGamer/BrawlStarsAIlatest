@@ -5,16 +5,19 @@ const keyboardPositions = [
     [0, -1], // down
     [-1, 0], // left
     [1, 0], // right
-    [0.707, -0.707], // up left
-    [0.707, 0.707], // up right
-    [-0.707, -0.707], // down left
-    [-0.707, 0.707], // down right
+    [-1, 1], // up left
+    [1, 1], // up right
+    [-1, -1], // down left
+    [1, -1], // down right
 ]; 
 
 class MouseControlType {
     #point = [0, 0];
     #radius = 10;
     wasMoving = false;
+
+    screenSize;
+    screenPosition;
 
     constructor(radius, point){
         this.#radius = radius;
@@ -31,7 +34,7 @@ class MouseControlType {
     }
 
     move(position){
-        let positionDistance = Math.sqrt(position.x * position.x + position.y * position.y);
+        let positionDistance = Math.sqrt(position[0] * position[0] + position[1] * position[1]);
 
         if(positionDistance < 0.1){
             this.stop()
@@ -44,7 +47,10 @@ class MouseControlType {
             this.wasMoving = true;
         }
 
-        mouseDrag(this.#point[0] + position[0] * this.#radius, this.#point[1] + position[1] * this.#radius)
+        mouseDrag(
+            this.screenPosition[0] + (this.#point[0] + position[0] * this.#radius) * this.screenSize[0], 
+            this.screenPosition[1] + (this.#point[1] + position[1] * this.#radius) * this.screenSize[1]
+        )
     }
 }
 
@@ -60,14 +66,16 @@ class KeyboardControlType {
         });
     }
 
-    begin(keys){
+    begin(keys){ // tommorrow: fix bug with 2 letter movements stopping
         this.#order.forEach((key) => {
-            if(this.#active[key] && !key.includes(keys)){
+            if(this.#active[key] && !keys.includes(key)){
                 this.stop(key)
             }
         });
 
         for(let key of keys){
+            if(this.#active[key]) continue;
+            
             KeyToggle(key, "down");
             this.#active[key] = true;
         }
@@ -89,7 +97,7 @@ class KeyboardControlType {
     }
 
     move(position){
-        let positionDistance = Math.sqrt(position.x * position.x + position.y * position.y);
+        let positionDistance = Math.sqrt(position[0] * position[0] + position[1] * position[1]);
 
         if(positionDistance < 0.25){
             this.stopAll();
@@ -100,11 +108,12 @@ class KeyboardControlType {
         let closestDistance = 99999
 
         for(let [index, keyboardPosition] of keyboardPositions.entries()){
-            let distance = Math.pow(keyboardPosition[0] - position[0], 2) + Math.pow(keyboardPosition[1] - position[1], 2)
+            let distance = [keyboardPosition[0] - position[0], keyboardPosition[1] - position[1]]
+            let magnitude = distance[0]*distance[0] + distance[1]*distance[1]
             
-            if(distance < closestDistance){
+            if(magnitude < closestDistance){
                 closest = index;
-                closestDistance = distance;
+                closestDistance = magnitude;
             }
         }
 

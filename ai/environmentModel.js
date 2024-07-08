@@ -31,16 +31,22 @@ function environmentLoss(yTrue, yPred) {
 }*/
 
 class EnvironmentModel {
-  Resolution
+  Resolution;
+  DetectionSettings;
 
-  constructor(Resolution) {
+  constructor(Resolution, DetectionSettings) {
     this.Resolution = Resolution;
+    this.DetectionSettings = DetectionSettings;
   }
 
   async warmup(){
-    for (let i = 0; i < 3; i++){
+    for (let i = 0; i < 25; i++){
       await this.predict(new Array(this.Resolution[0]*this.Resolution[1]*3));
     }
+  }
+
+  quit(){
+    this.browser.close()
   }
 
   launchModel(){
@@ -62,7 +68,11 @@ class EnvironmentModel {
 
       this.expressServer.get('/constants.json', (req, res) => {
         res.sendFile(path.join(__dirname, '/environment/constants.json'));
-    });
+      });
+
+      this.expressServer.get('/settings.json', (req, res) => {
+        res.json(this.DetectionSettings)
+      });
 
       this.expressServer.get('/:name.bin', (req, res) => {
         const name = req.params.name;
@@ -81,11 +91,20 @@ class EnvironmentModel {
       });
   
       this.browser = await puppeteer.launch({
-        headless: false,
+        headless: true,
         args: [
           "--no-sandbox",
           "--use-angle=default",
-          //'--use-gl=egl'
+
+          //`--headless=new`,
+          //`--use-angle=vulkan`,
+          //`--enable-features=Vulkan`,
+          //`--disable-vulkan-surface`,
+          //`--enable-unsafe-webgpu`,
+          //`--no-first-run`,
+          //`--no-default-browser-check`,
+          //`--disable-features=Translate`,
+          //`--ash-no-nudges`,
         ]
       })
   

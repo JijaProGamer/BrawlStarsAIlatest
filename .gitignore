@@ -1,7 +1,7 @@
 Screenshot*
 tests/*
 
-*yolov7*
+ai/actor/model/*
 
 weights.bin
 

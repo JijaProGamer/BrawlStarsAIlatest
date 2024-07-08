@@ -1,43 +1,5 @@
-
+const systeminformation = require('systeminformation'); 
 const child_process = require("child_process")
-
-function spawnScreen(Resolution, Framerate, WindowTitle) {
-    return new Promise((resolve, reject) => {
-        let screenProcess = child_process.spawn(`scrcpy`, [
-            `--no-audio`, // disable audio
-            //`--max-size=${Resolution[0]}`, // set resolution
-            `--video-bit-rate=8000K`, // max 5 megabits per second
-            `--max-fps=${Framerate * 2}`, // set fps
-            `--video-codec=h264`, // set codec (h264/h265)
-            //`--display-buffer=${Math.ceil(1000/Framerate)}`, // set display buffer to remove tearing
-            `--keyboard=uhid`, // hardware keyboard simulation
-            `--mouse=sdk`,
-            //`--mouse=uhid`, // hardware mouse simulation
-            //`--mouse=disabled`,
-            `--stay-awake`, // stops screen from going to sleep
-            '--disable-screensaver', // stops screen from going to sleep
-            `--window-title=${WindowTitle}`, // set screen title
-            `--window-borderless`, // remove borders
-            `--window-x=0`, `--window-y=0`, // set position to 0
-            `--render-driver=software`, // render using CPU instead of GPU (for recording)
-            //`--render-driver=opengl`, // render using GPU instead of CPU (for anti aliasing)
-        ])
-
-        screenProcess.stderr.on("data", (data) => {
-            console.log(data.toString())
-            if (data.toString().includes("ERROR: ")) {
-                screenProcess.kill()
-                reject(data.toString())
-            }
-        })
-
-        screenProcess.stdout.on("data", (data) => {
-            if (data.toString().includes("INFO: Texture: ")) {
-                resolve(screenProcess)
-            }
-        })
-    })
-}
 
 class CircularBuffer {
     constructor(maxSize) {
@@ -89,31 +51,66 @@ class CircularBuffer {
 }
 
 
-function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
+async function spawnScreenRecorder(Resolution, Framerate, screenUsed, {
     onStart,
     onFrame,
     onError,
     onClose
 }) {
+    const graphicsInfo = await systeminformation.graphics()
+    const screenInfo = graphicsInfo.displays[screenUsed]
+
     let ffmpegProcess = child_process.spawn(`ffmpeg`, [
         //`-re`, // force input to be framerate consistent
         `-hwaccel`, `d3d11va`,
+        `-init_hw_device`, `d3d11va`,
+
+        `-draw_mouse`, `0`,
+
+        `-framerate`, `${Framerate}`, // framerate
+        `-offset_x`, `${screenInfo.positionX}`,
+        `-offset_y`, `${screenInfo.positionY}`,
+        `-video_size`, `${screenInfo.currentResX}x${screenInfo.currentResY}`,
+
+        `-f`, `gdigrab`,
+        `-i`, `desktop`,
+
+        `-f`, `rawvideo`, // raw video data
+        //'-vf', `format=rgba,scale=${Resolution[0]}:${Resolution[1]}:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp`,
+        '-vf', `scale=${Resolution[0]}:${Resolution[1]}:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp`,
+        `-pix_fmt`, `rgba`,
+        `-an`, // no sound
+        `-` // pipe to stdout
+    ])
+
+    /*let ffmpegProcess = child_process.spawn(`ffmpeg`, [
+        //`-re`, // force input to be framerate consistent
+        `-hwaccel`, `d3d11va`,
+        `-init_hw_device`, `d3d11va`,
         `-draw_mouse`, `0`,
         `-f`, `gdigrab`, // app record mode
         `-framerate`, `${Framerate}`, // framerate
-        `-i`, `title=${WindowTitle}`, // screen title
+        `-i`, `title=BlueStacks App Player`, // screen title
         `-f`, `rawvideo`, // raw video data
         '-vf', `format=rgba,scale=${Resolution[0]}:${Resolution[1]}:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp`,
         `-an`, // no sound
-        `-draw_mouse`, `0`,
         `-` // pipe to stdout
-    ])
+    ])*/
+
+    /*let ffmpegProcess = child_process.spawn(`ffmpeg`, [
+        `-re`,
+        `-hwaccel`, `d3d11va`,
+        `-i`, `C:\\Users\\bloxx\\Downloads\\test_video_bb.mkv`,
+        `-f`, `rawvideo`,
+        '-vf', `format=rgba,scale=${Resolution[0]}:${Resolution[1]}:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp,fps=${Framerate}`,
+        `-an`,
+        `-`
+    ])*/
 
     let started = false;
 
     ffmpegProcess.stderr.on("data", (data) => {
         data = data.toString()
-        console.log(data)
 
         if (!started && data.includes("frame=")) {
             started = true;
@@ -140,8 +137,9 @@ function spawnScreenRecorder(Resolution, Framerate, WindowTitle, {
         }
     });
 }
+
 function parseRawVideoDataRGB(data) {
-    const pixels = Array(data.length * 3/4);//Array(data.length * 3/4);
+    const pixels = Array(data.length * 3/4);
 
     let k = 0;
     for (let i = 0; i < data.length; i += 4) {
@@ -149,9 +147,13 @@ function parseRawVideoDataRGB(data) {
         const green = data.readUInt8(i + 1);
         const blue = data.readUInt8(i + 2);
 
-        pixels[k] = Math.floor(red / 1.15);
-        pixels[k + 1] = Math.floor(green / 1.15);
-        pixels[k + 2] = Math.floor(blue / 1.15);
+        //pixels[k] = red;//Math.floor(red / 1.15);
+        //pixels[k + 1] = green;//Math.floor(green / 1.15);
+        //pixels[k + 2] = blue;//Math.floor(blue / 1.15);
+
+        pixels[k] = red;
+        pixels[k + 1] = green
+        pixels[k + 2] = blue;
 
         k += 3;
     }
@@ -160,15 +162,12 @@ function parseRawVideoDataRGB(data) {
     return pixels;
 }
 
-const fs = require("fs");
-
-module.exports = function StartScreen(Resolution, Framerate, WindowTitle, onFrame) {
-    return new Promise(async (resolve, reject) => {
-        let screen = await spawnScreen(Resolution, Framerate, WindowTitle)
-        let recorder;
+module.exports = function StartScreen(Resolution, Framerate, screenUsed, onFrame) {
+    return new Promise((resolve, reject) => {
+        let recorder
 
         function onStart() {
-            resolve([screen, recorder]);
+            resolve(recorder);
         }
 
         function onError(err) {
@@ -179,26 +178,12 @@ module.exports = function StartScreen(Resolution, Framerate, WindowTitle, onFram
             console.log(`recorder stopped with reason ${reason}`)
         }
 
-        /*let frameIndex = 0
-        function onFrame(pixels) {
-            frameIndex += 1;
-            let pixelsRGB = parseRawVideoDataRGB(pixels)
-
-
-            let ppmRGB = `P3\n${Resolution[0]} ${Resolution[1]}\n255\n`;
-
-            for (let i = 0; i < pixelsRGB.length; i += 3) {
-                ppmRGB += `${pixelsRGB[i]} ${pixelsRGB[i + 1]} ${pixelsRGB[i + 2]} `;
+        recorder = spawnScreenRecorder(
+            Resolution, Framerate, screenUsed, 
+            { 
+                onStart, onError, onClose, 
+                onFrame: (pixels) => onFrame(parseRawVideoDataRGB(pixels))
             }
-
-            fs.writeFile(`./tmp/frame${frameIndex}RGB.ppm`, ppmRGB, "utf-8", () => { })
-        }*/
-
-        setTimeout(() => {
-            recorder = spawnScreenRecorder(
-                Resolution, Framerate, WindowTitle, 
-                { onStart, onError, onClose, onFrame: (pixels) => onFrame(parseRawVideoDataRGB(pixels)) }
-            )
-        }, 1000)
+        )
     })
 }

@@ -10,9 +10,7 @@
 		const context = canvas.getContext("2d");
 		const contextMain = canvasMain.getContext("2d");
 
-		const options = { resolution: [256, 128] };
-
-
+		let options = { resolution: [448, 320] };
 
 		const labelColors = {
 			"Ball": "#e39309",
@@ -27,17 +25,23 @@
             "Safe_Friendly": "#0fa6d4",
 		}
 
-		window.electron.on_environment_detections(
-			([environmentResult, Image]) => {
-				lastInferencetime = environmentResult.duration.toFixed();
-				lastFrametime = lastInferencetime;
-
-				const imageData = createImageDataFromRGBArray(Image, options.resolution);
+		window.electron.on_settings(
+			([ Resolution ]) => {
+				options.resolution = Resolution;
 
 				canvas.width = options.resolution[0];
 				canvas.height = options.resolution[1];
 				canvasMain.width = options.resolution[0] * 5;
 				canvasMain.height = options.resolution[1] * 5;
+			}
+		)
+
+		window.electron.on_environment_detections(
+			([ environmentResult, Image ]) => {
+				lastInferencetime = environmentResult.duration.toFixed();
+				lastFrametime = lastInferencetime;
+
+				const imageData = createImageDataFromRGBArray(Image, options.resolution);
 
 				context.putImageData(imageData, 0, 0, 0, 0, canvas.width, canvas.height);
 				contextMain.drawImage(canvas, 0, 0, options.resolution[0], options.resolution[1], 0, 0, canvasMain.width, canvasMain.height);

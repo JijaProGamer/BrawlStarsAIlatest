@@ -14,7 +14,49 @@ const server = express();
 server.use(express.urlencoded({ extended: true }));
 server.use(express.json());
 
+
 let window;
+let environmentDetectionSettings = {
+    iouThreshold: 0.75,
+    scoreThreshold: 0.5,
+    softNmsSigma: 0.2,
+}
+
+let screenUsed = 0;
+
+let Resolution = [448, 320]
+let Framerate = 10
+
+const LocalEnvironment = new Environment({ 
+    Resolution, Framerate, screenUsed,
+    DetectionSettings: environmentDetectionSettings
+})
+
+app.on("before-quit", () => {
+    LocalEnvironment.quit()
+})
+
+let lastFrameEnded = true
+async function OnFrame(frame){
+    if(!lastFrameEnded || !LocalEnvironment.Started) return;
+    lastFrameEnded = false
+
+    const [ environmentResult ] = await LocalEnvironment.ProcessStep(frame);
+    //window.webContents.send("environment-detections", [ environmentResult, frame ]);
+    
+    //window.webContents.send("environment-detections", [ {predictions:[], duration: 0}, frame ]);
+
+    lastFrameEnded = true;
+}
+
+async function Run(){
+    const [_, recorder] = await Promise.all([
+        LocalEnvironment.init(),
+        StartScreen(Resolution, Framerate, screenUsed, OnFrame)
+    ])
+}
+
+
 
 function createWindow() {
     window = new BrowserWindow({
@@ -30,19 +72,17 @@ function createWindow() {
     })
 
     window.maximize();
-    window.loadURL(`http://127.0.0.1:${server_port}/`)
+    window.loadURL(`http://127.0.0.1:${server_port}/`);
+
+    window.webContents.once('did-finish-load', (e) => {
+        window.webContents.send("settings", [ Resolution ]);
+    })
 
     Run();
 }
 
 app.whenReady().then(() => {
     createWindow()
-
-    app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow()
-        }
-    })
 })
 
 app.on('window-all-closed', () => {
@@ -50,8 +90,6 @@ app.on('window-all-closed', () => {
         app.quit()
     }
 })
-
-
 
 /*ipcMain.on('request-data', (event) => {
     const data = { message: 'Hello from Node.js!' };
@@ -70,109 +108,3 @@ server.get('/build/:file', (req, res) => {
 });
 
 server.listen(server_port)
-
-/*const botTitleString = `
-    ░▒▓███████▓▒░ ░▒▓███████▓▒░       ░▒▓██████▓▒░░▒▓█▓▒░ 
-    ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░ 
-    ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░ 
-    ░▒▓███████▓▒░ ░▒▓██████▓▒░       ░▒▓████████▓▒░▒▓█▓▒░ 
-    ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░ 
-    ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░ 
-    ░▒▓███████▓▒░░▒▓███████▓▒░       ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░ 
-
-`;
-
-let subpanelsTraveled = "/";
-const panels = {
-    "/": [
-        "banana",
-        "nothing"
-    ],
-    "/banana": [
-        "idk",
-    ],
-    "/nothing": [
-        "womp",
-        "womp"
-    ]
-}
-
-function drawScreen() {
-    process.stdout.write('\x1Bc'); // clear the page
-    process.stdout.write(chalk.rgb(0, 255, 0)(botTitleString)); // write the title
-
-    console.log(subpanelsTraveled)
-    const panel = panels[subpanelsTraveled];
-    if (panel) {
-        for (let [index, option] of Object.entries(panel)) {
-            process.stdout.write(`${parseInt(index) + 1}) ${option}\n`);
-        }
-    }
-}
-
-drawScreen();
-
-process.stdin.resume();
-process.stdin.setEncoding('utf8');
-process.stdin.setRawMode(true);
-
-process.stdin.on("data", (stdin) => {
-    switch (stdin) {
-        case '\u0003':
-            process.exit();
-        case '\u001b':
-            if (subpanelsTraveled !== "/") {
-                let pathSegments = subpanelsTraveled.split("/");
-                pathSegments.pop();
-                subpanelsTraveled = pathSegments.join("/") || "/";
-                drawScreen(); // Ensure the screen is redrawn
-            }
-            break;
-        default:
-            stdin = stdin.toString().trim().toLowerCase();
-
-            if (/^\d+$/.test(stdin)) {
-                let selectedIndex = parseInt(stdin) - 1;
-                if (panels[subpanelsTraveled] && panels[subpanelsTraveled][selectedIndex]) {
-                    let nextPanel = panels[subpanelsTraveled][selectedIndex];
-                    if (subpanelsTraveled === "/") {
-                        subpanelsTraveled += nextPanel;
-                    } else {
-                        subpanelsTraveled += "/" + nextPanel;
-                    }
-                    drawScreen();
-                }
-            }
-            break;
-    }
-});*/
-
-let windowTitle = `brawlAI-screen-`
-let scoreThreshold = {
-    iouThreshold: 0.5,
-    scorescoreThreshold: 0.5
-}
-let Resolution = [256, 128]
-let framerate = 15
-
-let screenProcess
-let ffmpegProcess
-
-const LocalEnvironment = new Environment({Resolution, scoreThreshold })
-
-let lastFrameEnded = true
-async function OnFrame(frameData){
-    if(!lastFrameEnded) return;
-    lastFrameEnded = false;
-
-
-    const [ environmentResult, Image ] = await LocalEnvironment.ProcessStep(frameData);
-    window.webContents.send("environment-detections", [ environmentResult, Image ]);
-
-    lastFrameEnded = true;
-}
-
-async function Run(){
-    await LocalEnvironment.init()
-    ;[screenProcess, ffmpegProcess] = await StartScreen(Resolution, framerate, `${windowTitle}-${uuid.v4()}`, OnFrame);
-}

@@ -11,5 +11,5 @@
         "Safe_Enemy",
         "Safe_Friendly"
     ],
-    "model_size": 256
+    "model_size": [448, 320]
 }

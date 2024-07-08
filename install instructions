@@ -5,3 +5,8 @@ Change line 19 from
         (win32KeyEvent(key, flags), Sleep(DEADBEEF_RANDRANGE(63, 125)))
 to
 		(win32KeyEvent(key, flags))
+
+node-gyp rebuild 
+(inside the robotjs node modules)
+
+.\\node_modules\\.bin\\electron-rebuild.cmd

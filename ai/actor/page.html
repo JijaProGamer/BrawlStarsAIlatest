@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Actor Model</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.1.0"></script>
+</head>
+
+<body>
+    <script>
+        let constants;
+        let modelHyperparameters;
+        let labels;
+
+        class ActorModel {
+            Resolution
+
+            constructor() {
+                this.epsilon = 0;
+                this.memory = [];
+            }
+
+            async saveModel() {
+                await this.model.save(`http://localhost:${location.port}/model`);
+            }
+
+            async loadModel() {
+                this.model = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
+                this.targetModel = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
+            }
+
+            predict(state) {
+                return this.model.predict(state);
+            }
+
+            async targetPredict(state) {
+                return await this.targetModel.predict(state).data();
+            }
+
+            remember(state, action, reward, nextState, done) {
+                this.memory.push({ state, action, reward, nextState, done });
+                if (this.memory.length > modelHyperparameters.bufferSize) {
+                    this.memory.shift();
+                }
+            }
+
+            async replay() {
+                /*if (this.memory.length < modelHyperparameters.batchSize) {
+                    return;
+                }*/
+
+                const minibatch = this.memory.sort(() => Math.random() - 0.5).slice(0, modelHyperparameters.batchSize);
+
+                const states = [];
+                const targets = [];
+                for (const { state, action, reward, nextState, done } of minibatch) {
+                    let target = reward;
+                    if (!done) {
+                        const targetQValues = await this.targetPredict(nextState);
+                        target = reward + modelHyperparameters.gamma * targetQValues[action];
+                    }
+
+                    const targetF = this.predict(state).dataSync();
+                    targetF[action] = target;
+                    states.push(state);
+                    targets.push(targetF);
+                }
+
+                this.train(states, targets);
+            }
+
+            train(states, targets) {
+                const tensorStates = tf.tensor(states);
+                const tensorTargets = tf.tensor(targets);
+
+                this.model.fit(tensorStates, tensorTargets, { epochs: 1, verbose: 0 });
+                this.decayEpsilon()
+            }
+
+            updateTargetModel() {
+                this.targetModel.setWeights(this.model.getWeights());
+            }
+
+            decayEpsilon() {
+                if (this.epsilon > modelHyperparameters.minEpsilon) {
+                    this.epsilon *= modelHyperparameters.epsilonDecay;
+                }
+
+                fetch(`/epsilon?epsilon=${this.epsilon}`, { method: 'POST' });
+            }
+
+            async act(imageData, environmentData) {
+                const qValues = await tf.tidy(() => {
+                    const environmentTensor = tf.tensor1d(environmentData).expandDims(0);
+                    const imageTensor = tf.image.resizeBilinear(tf.browser.fromPixels(imageData), [constants.model_size[1], constants.model_size[0]])
+                        .div(255.0)
+                        .expandDims(0);
+
+                    const prediction = this.predict([imageTensor, environmentTensor]);
+                    return prediction;
+                }).data();
+
+                const actionProbabilities = [];
+                for (let i = 0; i < qValues.length; i++) {
+                    if (Math.random() <= this.epsilon) {
+                        actionProbabilities.push(Math.random() * 2 - 1);
+                    } else {
+                        actionProbabilities.push(Math.min(Math.max(qValues[i], -1), 1));
+                    }
+                }
+
+                return actionProbabilities;
+            }
+        }
+
+        let model = new ActorModel();
+        const socket = new WebSocket(`ws://localhost:${parseInt(location.port) + 1}`);
+
+        socket.addEventListener("open", (event) => {
+
+        });
+
+        socket.addEventListener("message", async (event) => {
+            if (!model.model) {
+                await getModel();
+            }
+
+            let data = JSON.parse(event.data);
+
+            switch (data.type) {
+                case "save":
+                    await model.saveModel();
+                    socket.send(JSON.stringify({ id: data.id }));
+                    break;
+                case "remember":
+                    model.remember(data.state, data.action, data.reward, data.nextState, data.done);
+                    break;
+                case "replay":
+                    await model.replay();
+                    socket.send(JSON.stringify({ id: data.id }));
+                    break;
+                case "updateTargetModel":
+                    model.updateTargetModel();
+                    break;
+                case "act":
+                    const imageData = createImageDataFromRGBArray(data.image, data.resolution);
+
+                    let result = await model.act(imageData, data.environment)
+                    socket.send(JSON.stringify({ id: data.id, predictions: result }));
+
+                    break;
+            }
+        });
+
+        function createImageDataFromRGBArray(rgbArray, resolution) {
+            const [width, height] = resolution;
+            const rgbaArray = new Uint8ClampedArray(width * height * 4);
+
+            for (let i = 0, j = 0; i < rgbArray.length; i += 3, j += 4) {
+                rgbaArray[j] = rgbArray[i];
+                rgbaArray[j + 1] = rgbArray[i + 1];
+                rgbaArray[j + 2] = rgbArray[i + 2];
+                rgbaArray[j + 3] = 255;
+            }
+
+            return new ImageData(rgbaArray, width, height);
+        }
+
+        async function getModel() {
+            await tf.setBackend('webgl');
+            await tf.ready();
+
+            constants = await (await fetch("/constants.json")).json();
+            modelHyperparameters = await (await fetch("/hyperparameters.json")).json();
+
+            model.epsilon = parseFloat(await (await fetch("/epsilon")).text());
+
+            await model.loadModel()
+        }
+    </script>
+</body>
+
+</html>
