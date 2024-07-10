@@ -17,14 +17,14 @@ server.use(express.json());
 
 let window;
 let environmentDetectionSettings = {
-    iouThreshold: 0.75,
+    iouThreshold: 0.85,
     scoreThreshold: 0.5,
     softNmsSigma: 0.2,
 }
 
 let screenUsed = 0;
 
-let Resolution = [448, 320]
+let Resolution = [448, 224]
 let Framerate = 10
 
 const LocalEnvironment = new Environment({ 
@@ -42,7 +42,7 @@ async function OnFrame(frame){
     lastFrameEnded = false
 
     const [ environmentResult ] = await LocalEnvironment.ProcessStep(frame);
-    //window.webContents.send("environment-detections", [ environmentResult, frame ]);
+    window.webContents.send("environment-detections", [ environmentResult, frame ]);
     
     //window.webContents.send("environment-detections", [ {predictions:[], duration: 0}, frame ]);
 

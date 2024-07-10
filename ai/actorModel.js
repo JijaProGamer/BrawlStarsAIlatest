@@ -37,21 +37,22 @@ class ActorModel {
     const additionalDataInput = tf.input({ shape: [InputElements], name: 'additional_data_input' });
 
     // Convolutional layers for image input
-    const convLayer = tf.layers.conv2d({ filters: 32, kernelSize: 3, activation: 'LeakyReLU' }).apply(imageInput);
-    const maxPoolLayer = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer);
-    const convLayer2 = tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'LeakyReLU' }).apply(maxPoolLayer);
+    const maxPoolLayer = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(imageInput);
+    const convLayer1 = tf.layers.conv2d({ filters: 32, kernelSize: 3, activation: 'relu' }).apply(maxPoolLayer);
+    const maxPoolLayer1 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer1);
+    const convLayer2 = tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu' }).apply(maxPoolLayer1);
     const maxPoolLayer2 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer2);
     const flattenLayer = tf.layers.flatten().apply(maxPoolLayer2);
 
     // Dense layers for additional data input
-    const denseLayer1 = tf.layers.dense({ units: 128, activation: 'LeakyReLU' }).apply(additionalDataInput);
-    const denseLayer2 = tf.layers.dense({ units: 64, activation: 'LeakyReLU' }).apply(denseLayer1);
+    const denseLayer1 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(additionalDataInput);
+    const denseLayer2 = tf.layers.dense({ units: 64, activation: 'relu' }).apply(denseLayer1);
 
     // Concatenate both branches
     const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer2]);
 
     // Dense layers after concatenation
-    const denseLayer3 = tf.layers.dense({ units: 128, activation: 'LeakyReLU' }).apply(concatenated);
+    const denseLayer3 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(concatenated);
     const output = tf.layers.dense({ units: OutputElements, activation: 'linear' }).apply(denseLayer3);
 
     const model = tf.model({ inputs: [imageInput, additionalDataInput], outputs: output });

@@ -19,6 +19,7 @@
     "node-abi": "^3.65.0",
     "puppeteer": "^22.9.0",
     "systeminformation": "^5.22.11",
+    "tesseract.js": "^5.1.0",
     "uuid": "^9.0.1",
     "ws": "^8.17.0",
     "xmlbuilder2": "^3.1.1",

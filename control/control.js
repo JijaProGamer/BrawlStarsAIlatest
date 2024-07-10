@@ -25,7 +25,10 @@ class MouseControlType {
     }
 
     begin(){
-        mouseMove(this.#point[0], this.#point[1])
+        mouseMove(
+            this.screenPosition[0] + this.#point[0] * this.screenSize[0], 
+            this.screenPosition[1] + this.#point[1] * this.screenSize[1]
+        )
         mouseToggle("down")
     }
 
@@ -37,7 +40,9 @@ class MouseControlType {
         let positionDistance = Math.sqrt(position[0] * position[0] + position[1] * position[1]);
 
         if(positionDistance < 0.1){
-            this.stop()
+            if(this.wasMoving){
+                this.stop()  
+            }
             this.wasMoving = false;
             return;
         }

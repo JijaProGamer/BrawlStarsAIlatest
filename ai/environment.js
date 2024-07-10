@@ -225,6 +225,7 @@ class Environment {
         //const closestEnemy = this.BallPosition;
 
         if(closestEnemy){
+            //if(closestEnemy[0] >=0){
             const direction = [localPosition[0] - closestEnemy.Position[0], localPosition[1] - closestEnemy.Position[1]];
             //const direction = [localPosition[0] - closestEnemy[0], localPosition[1] - closestEnemy[1]];
             const directionMagnitude = Math.sqrt(direction[0]*direction[0] + direction[1]*direction[1]);
@@ -234,20 +235,9 @@ class Environment {
             moveY = normalizedDirection[1];
         }
 
-        return [
-            0, 0,
-            moveX, moveY,
-            0, 0,
-
-            -1,
-            -1,
-            -1,
-            -1,
-        ]
-
         /*return [
-            moveX, moveY,
             0, 0,
+            moveX, -moveY,
             0, 0,
 
             -1,
@@ -255,17 +245,25 @@ class Environment {
             -1,
             -1,
         ]*/
+
+        return [
+            moveX, moveY,
+            0, 0,
+            0, 0,
+
+            -1,
+            -1,
+            -1,
+            -1,
+        ]
     }
 
     async ProcessStep(Image){
         const [ environmentResult ] = await this.CreateWorld(Image);
-        console.time("actor actions prediction")
-        let actorActions = await this.ActorModel.act(Image, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
-        //let actorActions = await this.fakeActorActions(Image);
-        //this.SetActor(actorActions)
-        console.log(actorActions);
-
-        console.timeEnd("actor actions prediction")
+        //let actorActions = await this.ActorModel.act(Image, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
+        let actorActions = await this.fakeActorActions(Image);
+        this.SetActor(actorActions)
+        //console.log(actorActions);
 
         return [ environmentResult ];
     }

@@ -1,14 +1,14 @@
-description: Ultralytics best model trained on /content/Brawl-Stars-Dataset-11/../data.yaml
+description: Ultralytics best model trained on /home/bloxxypc/Desktop/ultralytics/Brawl-Stars-Dataset-14/../data.yaml
 author: Ultralytics
-date: '2024-07-07T09:22:48.011435'
-version: 8.2.50
+date: '2024-07-10T08:30:45.298653'
+version: 8.2.51
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com
 stride: 32
 task: detect
 batch: 1
 imgsz:
-- 320
+- 224
 - 448
 names:
   0: Ball
