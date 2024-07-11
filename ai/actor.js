@@ -9,7 +9,7 @@ class Player {
     HasHypercharge = false
 
     Health = 0
-}
+} 
 
 let MoveController = new KeyboardControlType(["w", "s", "a", "d", "wa", "wd", "sa", "sd"])
 let ShootController = new MouseControlType(0.039, [0.898, 0.736]);

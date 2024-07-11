@@ -9,7 +9,7 @@ const fs = require("fs")
 
 const port = 7860;
 
-const InputElements = 161;
+const InputElements = 271;
 const OutputElements = 10;
 
 class ActorModel {
@@ -25,7 +25,7 @@ class ActorModel {
     this.epsilonDecay = 0.995; // how fast to stop learning the environment
     this.minEpsilon = 0.05; // the minimum chance to explore the environment
     this.bufferSize = matchLength * Framerate; // how big should the memory buffer be
-    this.batchSize = 256; // how much memory at a time should be trained, bigger values are faset (I heard it converges faster, but I think it's the opposite)
+    this.batchSize = 256; // how much memory at a time should be trained, bigger values are faster, but might not get accuracy as good as small values (16-32-64)
 
     this.optimizer = tf.train.adam(this.learningRate);
 
@@ -37,23 +37,25 @@ class ActorModel {
     const additionalDataInput = tf.input({ shape: [InputElements], name: 'additional_data_input' });
 
     // Convolutional layers for image input
-    const maxPoolLayer = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(imageInput);
-    const convLayer1 = tf.layers.conv2d({ filters: 32, kernelSize: 3, activation: 'relu' }).apply(maxPoolLayer);
+    const convLayer1 = tf.layers.depthwiseConv2d({ filters: 32, kernelSize: 7, activation: 'relu' }).apply(imageInput);
     const maxPoolLayer1 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer1);
-    const convLayer2 = tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu' }).apply(maxPoolLayer1);
-    const maxPoolLayer2 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer2);
-    const flattenLayer = tf.layers.flatten().apply(maxPoolLayer2);
+    const convLayer2 = tf.layers.depthwiseConv2d({ filters: 64, kernelSize: 5, activation: 'relu' }).apply(maxPoolLayer1);
+    const convLayer3 = tf.layers.depthwiseConv2d({ filters: 128, kernelSize: 3, activation: 'relu' }).apply(convLayer2);
+    const flattenLayer = tf.layers.flatten().apply(convLayer3);
 
     // Dense layers for additional data input
-    const denseLayer1 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(additionalDataInput);
-    const denseLayer2 = tf.layers.dense({ units: 64, activation: 'relu' }).apply(denseLayer1);
+    const denseLayer1 = tf.layers.prelu({ units: 2048, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(additionalDataInput);
+    const denseLayer2 = tf.layers.prelu({ units: 1024, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer1);
+    const denseLayer3 = tf.layers.prelu({ units: 512, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer2);
+    const denseLayer4 = tf.layers.prelu({ units: 1024, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer3);
+    const denseLayer5 = tf.layers.prelu({ units: 512, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer4);
 
     // Concatenate both branches
-    const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer2]);
+    const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer5]);
 
     // Dense layers after concatenation
-    const denseLayer3 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(concatenated);
-    const output = tf.layers.dense({ units: OutputElements, activation: 'linear' }).apply(denseLayer3);
+    const denseLayerFinal = tf.layers.prelu({ units: 4096, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(concatenated);
+    const output = tf.layers.dense({ units: OutputElements, activation: 'linear' }).apply(denseLayerFinal);
 
     const model = tf.model({ inputs: [imageInput, additionalDataInput], outputs: output });
 

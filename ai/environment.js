@@ -1,13 +1,16 @@
 const path = require("path");
 const { Actor, Player } = require("./actor");
-const actorModel = require("./actorModel.js")
-const environmentModel = require("./environmentModel.js")
+const actorModel = require("./actorModel.js");
+const environmentModel = require("./environmentModel.js");
+const fs = require("fs");
 
-const fs = require("fs")
+const getBBScores = require("../screen/getBBScores.js");
+const getGBGems = require("../screen/getGBGems.js");
+const getHealth = require("../screen/getHealth.js");
+const getHeistHealth = require("../screen/getHeistHealth.js");
 
-function lerp(x, y, t){
-    return x + t * (y - x);
-}
+const gamemodesIndices = ["BrawlBall", "GemGrab", "Heist", "Hotzone", "Showdown"];
+const maxMatchLength = 210;
 
 class Environment {
     Resolution;
@@ -20,15 +23,47 @@ class Environment {
     Friendly = [];
     Enemy = []
 
-    BallPosition = [0, 0, 0];
-    Time = 0;
-
     Started = false;
+    CurrentMatchType = "BrawlBall";
+    TimeLeft = 0;
+    GamemodeEnvironmentData = {
+        BrawlBall: {
+            ScoresEnemy: 0,
+            ScoresFriendly: 0,
+            BallPosition: [0, 0, 0]
+        },
+        GemGrab: {
+            GemsEnemy: 0,
+            GemsFriendly: 0,
+            GemPositions: []
+        },
+        Heist: {
+            HealthEnemy: 0,
+            HealthFriendly: 0,
+            FriendlyPosition: [],
+            EnemyPosition: []
+        },
+        Hotzone: {
+            PercentEnemy: 0,
+            PercentFriendly: 0,
+            HotzonePositions: [],
+        },
+        Showdown: {
+            PlayersAlive: 0,
+            PPs: [],
+            PP_Boxes: [],
+        }
+    }
 
     constructor({ Resolution, Framerate, DetectionSettings, screenUsed}){
         for(let i = 0; i < 15; i++){
             this.Friendly.push(new Player());
-            this.Enemy.push(new Player())
+            this.Enemy.push(new Player());
+            this.GamemodeEnvironmentData.GemGrab.GemPositions.push([0, 0, 0]);
+        }
+
+        for(let i = 0; i < 3; i++){
+            this.GamemodeEnvironmentData.Hotzone.HotzonePositions.push([0, 0, 0]);
         }
 
         this.Resolution = Resolution;
@@ -61,62 +96,114 @@ class Environment {
 
     async CreateWorld(Image){
         let environmentResult = await this.EnvironmentModel.predict(Image);
-        this.SetWorld(environmentResult.predictions)
+        this.SetModelDetections(environmentResult.predictions)
+        await this.SetScreenDetections(Image);
 
         return [ environmentResult ]
     }
 
-    /*async SetWorld(prediction){
-        if(prediction[0] > 0){
-            this.BallPosition = [prediction[1], prediction[2]]
+    async SetScreenDetections(Image){
+        switch(this.CurrentMatchType){
+            case "BrawlBall":
+                const bbImageData = getBBScores(Image, this.Resolution);
+                this.GamemodeEnvironmentData.BrawlBall.ScoresEnemy = bbImageData.enemy;
+                this.GamemodeEnvironmentData.BrawlBall.ScoresFriendly = bbImageData.friendly;
+                break;
+            case "GemGrab":
+                const gbImageData = getGBGems(Image, this.Resolution);
+                this.GamemodeEnvironmentData.GemGrab.ScoresEnemy = gbImageData.enemy;
+                this.GamemodeEnvironmentData.GemGrab.ScoresFriendly = gbImageData.friendly;
+                break;
+            case "Heist":
+                const heistImageData = getHeistHealth(Image, this.Resolution);
+                this.GamemodeEnvironmentData.Heist.HealthEnemy = heistImageData.enemy;
+                this.GamemodeEnvironmentData.Heist.HealthFriendly = heistImageData.friendly;
+                break;
+            case "Hotzone":
+                //const heistImageData = getHeistHealth(Image, this.Resolution);
+                //this.GamemodeEnvironmentData.Heist.HealthEnemy = heistImageData.enemy;
+                //this.GamemodeEnvironmentData.Heist.HealthFriendly = heistImageData.friendly;
+                break;
+            case "Showdown":
+                break;
+        }
+    }
+
+    SetModelDetections(prediction){
+        let me = prediction.filter((v) => v.class == "Me")[0];
+        let friendly = prediction.filter((v) => v.class == "Friendly");
+        let enemy = prediction.filter((v) => v.class == "Enemy");
+
+        let ball = prediction.filter((v) => v.class == "Ball")[0];
+        let safe_friendly = prediction.filter((v) => v.class == "Safe_Friendly")[0];
+        let safe_enemy = prediction.filter((v) => v.class == "Safe_Enemy")[0];
+
+        let hot_zones = prediction.filter((v) => v.class == "Hot_Zone");
+        let pps = prediction.filter((v) => v.class == "PP");
+        let pp_boxes = prediction.filter((v) => v.class == "PP_Box");
+        let gems = prediction.filter((v) => v.class == "Gem");
+
+        if(ball){
+            this.GamemodeEnvironmentData.BrawlBall.BallPosition = [(ball.x1 + ball.x2) / 2, (ball.y1 + ball.y2) / 2]
         } else {
-            this.BallPosition = [-1, -1]
+            this.GamemodeEnvironmentData.BrawlBall.BallPosition = [-1, -1]
         }
 
-        let lastIndex = 3;
+        if(safe_friendly){
+            this.GamemodeEnvironmentData.Heist.FriendlyPosition = [(safe_friendly.x1 + safe_friendly.x2) / 2, (safe_friendly.y1 + safe_friendly.y2) / 2]
+        } else {
+            this.GamemodeEnvironmentData.Heist.FriendlyPosition = [-1, -1]
+        }
 
-        function setPlayer(player){
-            if(prediction[lastIndex] > 0){
-                player.Position = [prediction[lastIndex + 1], prediction[lastIndex + 2]];
-                //player.HasUltra = prediction[lastIndex + 3] > 0;
-                //player.HasHypercharge = prediction[lastIndex + 4] > 0;
+        if(safe_enemy){
+            this.GamemodeEnvironmentData.Heist.EnemyPosition = [(safe_enemy.x1 + safe_enemy.x2) / 2, (safe_enemy.y1 + safe_enemy.y2) / 2]
+        } else {
+            this.GamemodeEnvironmentData.Heist.EnemyPosition = [-1, -1]
+        }
+
+        for(let i = 0; i < 15; i++){
+            let gem = gems[i];
+            if(gem){
+                this.GamemodeEnvironmentData.GemGrab.GemPositions[i] = [(gem.x1 + gem.x2) / 2, (gem.y1 + gem.y2) / 2]
             } else {
-                //player.HasUltra = false;
-                //player.HasHypercharge = false;
-                player.Position = [-1, -1];
-                player.Health = 0;
+                this.GamemodeEnvironmentData.GemGrab.GemPositions[i] = [-1, -1]
             }
-
-            //lastIndex += 5;
-            lastIndex += 3;
-        }
-
-        function setLocalPlayer(){
-
-        }
-
-        setPlayer(this.Actor)
-        setLocalPlayer()
-
-        for(let i = 0; i < 2; i++){
-            setPlayer(this.Friendly[i])
         }
 
         for(let i = 0; i < 3; i++){
-            setPlayer(this.Enemy[i])
+            let hot_zone = hot_zones[i];
+            if(hot_zone){
+                this.GamemodeEnvironmentData.Hotzone.HotzonePositions[i] = [(hot_zone.x1 + hot_zone.x2) / 2, (hot_zone.y1 + hot_zone.y2) / 2]
+            } else {
+                this.GamemodeEnvironmentData.Hotzone.HotzonePositions[i] = [-1, -1]
+            }
         }
-    }*/
 
-    async SetWorld(prediction){
-        let ball = prediction.filter((v) => v.class == "Ball")[0]
-        let me = prediction.filter((v) => v.class == "Me")[0]
-        let friendly = prediction.filter((v) => v.class == "Friendly")
-        let enemy = prediction.filter((v) => v.class == "Enemy")
+        for(let i = 0; i < 15; i++){
+            let pp = pps[i];
+            if(pp){
+                this.GamemodeEnvironmentData.Showdown.PPs[i] = [(pp.x1 + pp.x2) / 2, (pp.y1 + pp.y2) / 2]
+            } else {
+                this.GamemodeEnvironmentData.Showdown.PPs[i] = [-1, -1]
+            }
+        }
 
-        if(ball){
-            this.BallPosition = [(ball.x1 + ball.x2) / 2, (ball.y1 + ball.y2) / 2]
-        } else {
-            this.BallPosition = [-1, -1]
+        for(let i = 0; i < 15; i++){
+            let pp = pps[i];
+            if(pp){
+                this.GamemodeEnvironmentData.Showdown.PPs[i] = [(pp.x1 + pp.x2) / 2, (pp.y1 + pp.y2) / 2]
+            } else {
+                this.GamemodeEnvironmentData.Showdown.PPs[i] = [-1, -1]
+            }
+        }
+
+        for(let i = 0; i < 15; i++){
+            let pp_box = pp_boxes[i];
+            if(pp_box){
+                this.GamemodeEnvironmentData.Showdown.PP_Boxes[i] = [(pp_box.x1 + pp_box.x2) / 2, (pp_box.y1 + pp_box.y2) / 2]
+            } else {
+                this.GamemodeEnvironmentData.Showdown.PP_Boxes[i] = [-1, -1]
+            }
         }
 
         function setPlayer(player, playerData){
@@ -124,30 +211,20 @@ class Environment {
                 //player.Position = [(playerData.x1 + playerData.x2) / 2, (playerData.x1 + playerData.y2) / 2];
                 const biggestY = playerData.y1 > playerData.y2 ? playerData.y1 : playerData.y2;
                 player.Position = [(playerData.x1 + playerData.x2) / 2, biggestY - 0.07];
-
-                //player.HasUltra = prediction[lastIndex + 3] > 0;
-                //player.HasHypercharge = prediction[lastIndex + 4] > 0;
             } else {
-                //player.HasUltra = false;
-                //player.HasHypercharge = false;
                 player.Position = [-1, -1];
                 player.Health = 0;
             }
         }
 
-        function setLocalPlayer(){
-
-        }
-
-        setPlayer(this.Actor, me)
-        setLocalPlayer()
+        setPlayer(this.Actor, me);
 
         for(let i = 0; i < 15; i++){
-            setPlayer(this.Friendly[i], friendly[i])
+            setPlayer(this.Friendly[i], friendly[i]);
         }
 
         for(let i = 0; i < 15; i++){
-            setPlayer(this.Enemy[i], enemy[i])
+            setPlayer(this.Enemy[i], enemy[i]);
         }
     }
 
@@ -165,10 +242,38 @@ class Environment {
     }
 
     PipeEnvironment(){
-        return [
-            ...this.BallPosition,
-            this.Time
+        let pipe = [
+            gamemodesIndices.indexOf(this.CurrentMatchType),
+            this.TimeLeft / maxMatchLength,
+
+            this.GamemodeEnvironmentData.BrawlBall.ScoresEnemy / 2,
+            this.GamemodeEnvironmentData.BrawlBall.ScoresFriendly / 2,
+            ...this.GamemodeEnvironmentData.BrawlBall.BallPosition,
+
+            this.GamemodeEnvironmentData.GemGrab.GemsEnemy / 29,
+            this.GamemodeEnvironmentData.GemGrab.GemsFriendly / 29,
+            ...this.GamemodeEnvironmentData.GemGrab.GemPositions.flat(),
+
+            this.GamemodeEnvironmentData.Heist.HealthEnemy / 100,
+            this.GamemodeEnvironmentData.Heist.HealthFriendly / 100,
+            ...this.GamemodeEnvironmentData.Heist.EnemyPosition.flat(),
+            ...this.GamemodeEnvironmentData.Heist.FriendlyPosition.flat(),
+
+            this.GamemodeEnvironmentData.Hotzone.PercentEnemy / 100,
+            this.GamemodeEnvironmentData.Hotzone.PercentFriendly / 100,
+            ...this.GamemodeEnvironmentData.Hotzone.HotzonePositions.flat(),
+
+            this.GamemodeEnvironmentData.Showdown.PlayersAlive / 10,
+            ...this.GamemodeEnvironmentData.Showdown.PPs.flat(),
+            ...this.GamemodeEnvironmentData.Showdown.PP_Boxes.flat(),
+
+            ...this.PipeActor(),
+            ...this.PipeEnemy(),
+            ...this.PipeFriendly(),
         ]
+
+
+        return pipe
     }
 
     PipeActor(){
@@ -260,12 +365,16 @@ class Environment {
 
     async ProcessStep(Image){
         const [ environmentResult ] = await this.CreateWorld(Image);
-        //let actorActions = await this.ActorModel.act(Image, [...this.PipeEnvironment(), ...this.PipeActor(), ...this.PipeFriendly(), ...this.PipeEnemy()]);
-        let actorActions = await this.fakeActorActions(Image);
-        this.SetActor(actorActions)
-        //console.log(actorActions);
 
-        return [ environmentResult ];
+        let actorTime = Date.now()
+        let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
+        actorTime = Date.now() - actorTime;
+
+        //let actorActions = await this.fakeActorActions(Image);
+        //this.SetActor(actorActions)
+        //console.log(actorActions, actorTime);
+
+        return [ environmentResult, actorTime ];
     }
 }
 

@@ -76,4 +76,4 @@ async function getHealth(image, imageBuffer, resolution, ocrSheduler, player){
     }
 }
 
-module.exports = { getHealth }
+module.exports = getHealth;
