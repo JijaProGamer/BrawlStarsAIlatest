@@ -1,84 +1,48 @@
+const imageToText = require("./imageToText.js")
+const cutout = require("./cutout.js")
+
 const friendlyAABB = {
-    x1: 0.0233,
-    x2: 0.0345,
-    y1: 0.0342,
-    y2: 0.0750,
+    x1: 0.02,
+    x2: 0.1,
+    y1: 0.02,
+    y2: 0.105,
 }
 
 const enemyAABB = {
-    x1: 0.9583,
-    x2: 0.9695,
-    y1: 0.0342,
-    y2: 0.0750,
+    x1: 0.94,
+    x2: 0.99,
+    y1: 0.02,
+    y2: 0.105,
 }
 function isWhitePixel(r, g, b){
-    return r > 200 && g > 200 && b > 200
+    return (r > 125 && g > 125 && b > 125 && g*1.25 > b) ? [r, g, b] : [0, 0, 0]
 }
 
-async function getBBScores(image, resolution){
-    let pixelsFriendly = 0;
-    let goodPixelsFriendly = 0;
+async function getGBGems(image, resolution, ocrSheduler){
+    const cutoutFriendly = cutout(image, resolution, {
+        x1: Math.round(friendlyAABB.x1 * resolution[0]),
+        x2: Math.round(friendlyAABB.x2 * resolution[0]),
+        y1: Math.round(friendlyAABB.y1 * resolution[1]),
+        y2: Math.round(friendlyAABB.y2 * resolution[1]),
+    }, 
+    isWhitePixel);
 
-    let pixelsEnemy = 0;
-    let goodPixelsEnemy = 0;
-    
-    for(let x = Math.round(friendlyAABB.x1 * resolution[0]); x < Math.round(friendlyAABB.x2 * resolution[0]); x++){
-        for(let y = Math.round(friendlyAABB.y1 * resolution[1]); y < Math.round(friendlyAABB.y2 * resolution[1]); y++){
-            const index = (x * resolution[0] + y) * 3;
-            const r = image[index];
-            const g = image[index + 1];
-            const b = image[index + 2];
-            
-            if(isWhitePixel(r, g, b)) {
-                goodPixelsFriendly ++;
-            }
+    const cutoutEnemy = cutout(image, resolution, {
+        x1: Math.round(enemyAABB.x1 * resolution[0]),
+        x2: Math.round(enemyAABB.x2 * resolution[0]),
+        y1: Math.round(enemyAABB.y1 * resolution[1]),
+        y2: Math.round(enemyAABB.y2 * resolution[1]),
+    }, isWhitePixel);
 
-            pixelsFriendly += 1;
-        }
-    }
+    const [textFriendly, textEnemy] = await Promise.all([
+        imageToText(cutoutFriendly.image, cutoutFriendly.resolution, ocrSheduler),
+        imageToText(cutoutEnemy.image, cutoutEnemy.resolution, ocrSheduler)
+    ])
 
-    for(let x = Math.round(enemyAABB.x1 * resolution[0]); x < Math.round(enemyAABB.x2 * resolution[0]); x++){
-        for(let y = Math.round(enemyAABB.y1 * resolution[1]); y < Math.round(enemyAABB.y2 * resolution[1]); y++){
-            const index = (x * resolution[0] + y) * 3;
-            const r = image[index];
-            const g = image[index + 1];
-            const b = image[index + 2];
-            
-            if(isWhitePixel(r, g, b)) {
-                goodPixelsEnemy ++;
-            }
-
-            pixelsEnemy += 1;
-        }
-    }
-
-    const percentFriendly = goodPixelsFriendly/pixelsFriendly;
-    const percentEnemy = goodPixelsEnemy/pixelsEnemy;
-
-    const closestDistanceFriendly = 2;
-    const closestIndexFriendly = -1;
-    for(let [index, value] of whitePixelsValues.entries()){
-        let distance = Math.abs(value - percentFriendly);
-        if(distance < closestDistanceFriendly){
-            closestDistanceFriendly = distance;
-            closestIndexFriendly = index;
-        }
-    }
-
-    const closestDistanceEnemy = 2;
-    const closestIndexEnemy = -1;
-    for(let [index, value] of whitePixelsValues.entries()){
-        let distance = Math.abs(value - percentEnemy);
-        if(distance < closestDistanceEnemy){
-            closestDistanceEnemy = distance;
-            closestIndexEnemy = index;
-        }
-    }
-    
     return {
-        friendly: whitePixelsKeys[closestIndexFriendly],
-        enemy: whitePixelsKeys[closestIndexEnemy],
+        friendly: isNaN(parseInt(textFriendly)) ? 0 : parseInt(textFriendly),
+        enemy: isNaN(parseInt(textEnemy)) ? 0 : parseInt(textEnemy)
     }
 }
 
-module.exports = getBBScores;
+module.exports = getGBGems;

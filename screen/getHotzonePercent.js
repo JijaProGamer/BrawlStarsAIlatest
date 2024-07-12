@@ -1,21 +1,21 @@
 const friendlyAABB = {
-    x1: 0.0345,
-    x2: 0.1266,
-    y:  0.0703,
+    x1: 0.0400,
+    x2: 0.1600,
+    y:  0.0700,
 }
 
 const enemyAABB = {
-    x1: 0.0345,
-    x2: 0.1266,
+    x1: 0.0400,
+    x2: 0.1600,
     y:  0.1250,
 }
 
 function isFriendlyPixel(r, g, b){
-    return r < 100 && g < 150 && b > 200;
+    return b > 80 && r < 100;
 }
 
 function isEnemyPixel(r, g, b){
-    return r > 200 && g < 100 && b < 100;
+    return r > 150 && r > g && g > b;
 }
 
 function getHotzonePercent(image, resolution){
@@ -25,10 +25,10 @@ function getHotzonePercent(image, resolution){
     let pixelsEnemy = 0;
     let goodPixelsEnemy = 0;
     
-    let y = Math.round(friendlyAABB.y1 * resolution[1]);
+    let y1 = Math.round(friendlyAABB.y * resolution[1]);
 
     for(let x = Math.round(friendlyAABB.x1 * resolution[0]); x < Math.round(friendlyAABB.x2 * resolution[0]); x++){
-        const index = (y * resolution[0] + x) * 3;
+        const index = (y1 * resolution[0] + x) * 3;
         const r = image[index];
         const g = image[index + 1];
         const b = image[index + 2];
@@ -40,8 +40,10 @@ function getHotzonePercent(image, resolution){
         pixelsFriendly += 1;
     }
 
+    let y2 = Math.round(enemyAABB.y * resolution[1]);
+
     for(let x = Math.round(enemyAABB.x1 * resolution[0]); x < Math.round(enemyAABB.x2 * resolution[0]); x++){
-            const index = (y * resolution[0] + x) * 3;
+            const index = (y2 * resolution[0] + x) * 3;
             const r = image[index];
             const g = image[index + 1];
             const b = image[index + 2];

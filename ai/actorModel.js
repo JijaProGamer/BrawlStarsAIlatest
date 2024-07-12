@@ -44,17 +44,15 @@ class ActorModel {
     const flattenLayer = tf.layers.flatten().apply(convLayer3);
 
     // Dense layers for additional data input
-    const denseLayer1 = tf.layers.prelu({ units: 2048, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(additionalDataInput);
-    const denseLayer2 = tf.layers.prelu({ units: 1024, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer1);
-    const denseLayer3 = tf.layers.prelu({ units: 512, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer2);
-    const denseLayer4 = tf.layers.prelu({ units: 1024, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer3);
-    const denseLayer5 = tf.layers.prelu({ units: 512, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer4);
+    const denseLayer1 = tf.layers.prelu({ units: 256, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(additionalDataInput);
+    const denseLayer2 = tf.layers.prelu({ units: 512, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer1);
+    const denseLayer3 = tf.layers.prelu({ units: 128, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(denseLayer2);
 
     // Concatenate both branches
-    const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer5]);
+    const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer3]);
 
     // Dense layers after concatenation
-    const denseLayerFinal = tf.layers.prelu({ units: 4096, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(concatenated);
+    const denseLayerFinal = tf.layers.prelu({ units: 512, activation: 'prelu', alphaInitializer: 'glorotUniform' }).apply(concatenated);
     const output = tf.layers.dense({ units: OutputElements, activation: 'linear' }).apply(denseLayerFinal);
 
     const model = tf.model({ inputs: [imageInput, additionalDataInput], outputs: output });

@@ -3,6 +3,9 @@ tests/*
 
 ai/actor/model/*
 
+environmentTraining/data/*
+environmentTraining/raw_data/*
+
 weights.bin
 
 # Logs

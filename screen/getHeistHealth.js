@@ -1,21 +1,21 @@
 const friendlyAABB = {
-    x1: 0.0191,
-    x2: 0.1187,
+    x1: 0.0225,
+    x2: 0.1500,
     y:  0.0675,
 }
 
 const enemyAABB = {
-    x1: 0.8833,
-    x2: 0.9820,
+    x1: 0.8525,
+    x2: 0.9800,
     y:  0.0675,
 }
 
 function isFriendlyPixel(r, g, b){
-    return r < 100 && g < 150 && b > 200;
+    return r < 200 ? b > 100 : b > 200;
 }
 
 function isEnemyPixel(r, g, b){
-    return r > 200 && g < 100 && b < 100;
+    return r > 100 && r > g && r > b;
 }
 
 function getHeistsHealth(image, resolution){
@@ -25,7 +25,7 @@ function getHeistsHealth(image, resolution){
     let pixelsEnemy = 0;
     let goodPixelsEnemy = 0;
     
-    let y = Math.round(friendlyAABB.y1 * resolution[1]);
+    let y = Math.round(friendlyAABB.y * resolution[1]);
 
     for(let x = Math.round(friendlyAABB.x1 * resolution[0]); x < Math.round(friendlyAABB.x2 * resolution[0]); x++){
         const index = (y * resolution[0] + x) * 3;

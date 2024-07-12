@@ -1,13 +1,17 @@
 const path = require("path");
+const Tesseract = require("tesseract.js");
+const os = require('os');
 const { Actor, Player } = require("./actor");
 const actorModel = require("./actorModel.js");
 const environmentModel = require("./environmentModel.js");
 const fs = require("fs");
+const Brain = require("./brain.js")
 
 const getBBScores = require("../screen/getBBScores.js");
 const getGBGems = require("../screen/getGBGems.js");
 const getHealth = require("../screen/getHealth.js");
 const getHeistHealth = require("../screen/getHeistHealth.js");
+const getHotzonePercent = require("../screen/getHotzonePercent.js");
 
 const gamemodesIndices = ["BrawlBall", "GemGrab", "Heist", "Hotzone", "Showdown"];
 const maxMatchLength = 210;
@@ -18,6 +22,10 @@ class Environment {
 
     ActorModel;
     EnvironmentModel;
+
+    lastActorState;
+
+    ocrSheduler = Tesseract.createScheduler();
 
     Actor = new Actor();
     Friendly = [];
@@ -74,6 +82,11 @@ class Environment {
     }
 
     async init(){
+        for(let i = 0; i < os.cpus().length; i++){
+            const worker = await Tesseract.createWorker('eng');
+            this.ocrSheduler.addWorker(worker);
+        }
+
         if(!fs.existsSync(path.join(__dirname, "/actor/model/"))){
             await this.ActorModel.saveModelLayout();
         }
@@ -110,7 +123,8 @@ class Environment {
                 this.GamemodeEnvironmentData.BrawlBall.ScoresFriendly = bbImageData.friendly;
                 break;
             case "GemGrab":
-                const gbImageData = getGBGems(Image, this.Resolution);
+                const gbImageData = await getGBGems(Image, this.Resolution, this.ocrSheduler);
+                console.log(gbImageData)
                 this.GamemodeEnvironmentData.GemGrab.ScoresEnemy = gbImageData.enemy;
                 this.GamemodeEnvironmentData.GemGrab.ScoresFriendly = gbImageData.friendly;
                 break;
@@ -120,9 +134,10 @@ class Environment {
                 this.GamemodeEnvironmentData.Heist.HealthFriendly = heistImageData.friendly;
                 break;
             case "Hotzone":
-                //const heistImageData = getHeistHealth(Image, this.Resolution);
-                //this.GamemodeEnvironmentData.Heist.HealthEnemy = heistImageData.enemy;
-                //this.GamemodeEnvironmentData.Heist.HealthFriendly = heistImageData.friendly;
+                const hotzoneImageData = getHotzonePercent(Image, this.Resolution);
+                console.log(hotzoneImageData);
+                this.GamemodeEnvironmentData.Hotzone.PercentEnemy = hotzoneImageData.enemy;
+                this.GamemodeEnvironmentData.Hotzone.PercentFriendly = hotzoneImageData.friendly;
                 break;
             case "Showdown":
                 break;
@@ -363,12 +378,28 @@ class Environment {
         ]
     }
 
+    CalculateRewards(LastEnvironmentData){
+        let reward = 0;
+
+
+
+        return reward;
+    }
+
     async ProcessStep(Image){
         const [ environmentResult ] = await this.CreateWorld(Image);
 
         let actorTime = Date.now()
+        //let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
         let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
         actorTime = Date.now() - actorTime;
+
+        const reward = this.CalculateRewards();
+        if(this.lastActorState){
+            this.ActorModel.remember(this.lastActorState, actorActions, reward, [Image, this.PipeEnvironment()], false);
+        }
+
+        this.lastActorState = [Image, this.PipeEnvironment()];
 
         //let actorActions = await this.fakeActorActions(Image);
         //this.SetActor(actorActions)
