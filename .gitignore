@@ -3,6 +3,10 @@ tests/*
 
 ai/actor/model/*
 
+apikey
+
+video.raw
+
 environmentTraining/data/*
 environmentTraining/raw_data/*
 

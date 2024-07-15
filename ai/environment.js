@@ -391,7 +391,7 @@ class Environment {
 
         let actorTime = Date.now()
         //let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
-        let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
+        let actorActions = await Brain(this, Image, this);
         actorTime = Date.now() - actorTime;
 
         const reward = this.CalculateRewards();

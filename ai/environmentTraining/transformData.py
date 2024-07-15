@@ -6,26 +6,42 @@ import albumentations as A
 # Define augmentations
 transform = A.Compose([
     A.Resize(224, 448),
-
-    A.HorizontalFlip(p=0.5),
-    A.ShiftScaleRotate(shift_limit=0.04, scale_limit=0, rotate_limit=0, p=0.35),
-
+    #A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0, rotate_limit=0, p=0.35),
     A.RandomBrightnessContrast(p=0.35),
     A.RandomGamma(p=0.35),
     A.RGBShift(p=0.35),
-    A.Blur(blur_limit=2, p=0.35)
-], bbox_params=A.BboxParams(format='yolo'))
+    A.Blur(blur_limit=3, p=0.1)
+], bbox_params=A.BboxParams(format='yolo', label_fields=['category_ids']))
+
+def read_labels(label_path):
+    bboxes = []
+    category_ids = []
+    with open(label_path, 'r') as file:
+        for line in file:
+            parts = line.strip().split()
+            category_id = int(parts[0])
+            bbox = list(map(float, parts[1:]))
+            bboxes.append(bbox)
+            category_ids.append(category_id)
+    return bboxes, category_ids
+
+def write_labels(label_path, bboxes, category_ids):
+    with open(label_path, 'w') as file:
+        for bbox, category_id in zip(bboxes, category_ids):
+            bbox_str = ' '.join(map(str, bbox))
+            file.write(f"{category_id} {bbox_str}\n")
 
 def augment_and_save(image_path, label_path, output_image_path, output_label_path, num_augmentations=10):
     # Load image and corresponding label
     image = cv2.imread(image_path)
-    with open(label_path, 'r') as file:
-        labels = file.read()
+    bboxes, category_ids = read_labels(label_path)
     
     # Apply augmentations
     for i in range(num_augmentations):
-        augmented = transform(image=image)
+        augmented = transform(image=image, bboxes=bboxes, category_ids=category_ids)
         augmented_image = augmented['image']
+        augmented_bboxes = augmented['bboxes']
+        augmented_category_ids = augmented['category_ids']
         
         # Determine file extension and name
         file_extension = os.path.splitext(image_path)[1]
@@ -35,8 +51,7 @@ def augment_and_save(image_path, label_path, output_image_path, output_label_pat
         
         # Save augmented image and labels
         cv2.imwrite(output_image_file, augmented_image)
-        with open(output_label_file, 'w') as file:
-            file.write(labels)
+        write_labels(output_label_file, augmented_bboxes, augmented_category_ids)
 
 def process_directory(images_dir, labels_dir, output_images_dir, output_labels_dir, num_augmentations=10):
     for file in os.listdir(images_dir):
@@ -62,8 +77,8 @@ output_val_images_dir = 'data/valid/images'
 output_val_labels_dir = 'data/valid/labels'
 
 # Process training and valid folders
-process_directory(input_train_images_dir, input_train_labels_dir, output_train_images_dir, output_train_labels_dir, num_augmentations=10)
-process_directory(input_val_images_dir, input_val_labels_dir, output_val_images_dir, output_val_labels_dir, num_augmentations=10)
+process_directory(input_train_images_dir, input_train_labels_dir, output_train_images_dir, output_train_labels_dir, num_augmentations=25)
+process_directory(input_val_images_dir, input_val_labels_dir, output_val_images_dir, output_val_labels_dir, num_augmentations=25)
 
 # Copy data.yaml file
 shutil.copy('raw_data/data.yaml', 'data/data.yaml')
