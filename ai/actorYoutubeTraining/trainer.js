@@ -1,4 +1,4 @@
-const tf = require('@tensorflow/tfjs-node'); // If using Node.js
+/*const tf = require('@tensorflow/tfjs-node'); // If using Node.js
 
 // Example dataset generator function
 async function* myDataGenerator(numEpochs, batchSize) {
@@ -75,4 +75,64 @@ async function main() {
   console.log('Training completed.');
 }
 
-main();
+main();*/
+
+const path = require("path");
+
+const playlistID = "PLGtZwVE-T07vYODoUzNweS6upEexk3024";
+
+const epochs = 1;
+const batchSize = 30;
+
+const secondsCutBeggining = 90;
+const secondsCutEnding = 90;
+
+const framesPerVideo = 1200;
+
+const { GetPlaylistVideos, DownloadVideo, CreateBatchData, LocalEnvironment, ActorTraining } = require("./data_gatherer.js");
+
+async function DoEpoch(playlists){
+  for(let videoId of playlists){
+    let videoRaw = await DownloadVideo(videoId, LocalEnvironment.Resolution)
+    let videoFrames = videoRaw.length / ((LocalEnvironment.Resolution[0] * LocalEnvironment.Resolution[1]) * 4)
+            - secondsCutBeggining * LocalEnvironment.Framerate
+            - secondsCutEnding * LocalEnvironment.Framerate;
+
+    let framesUsed = Array.from({ length: videoFrames }, (_, i) => i + (secondsCutBeggining * LocalEnvironment.Framerate))
+      .map((v) => { return { v, r: Math.random() } })
+      .sort((a, b) => a.r - b.r)
+      .map(v => v.v)
+      .slice(0, framesPerVideo);
+          
+    let batches = Math.max(framesUsed.length / batchSize);
+
+    for(let batchNum = 0; batchNum < batches; batchNum++){
+      const batch = await CreateBatchData(LocalEnvironment.Resolution, videoRaw, framesUsed.slice(batchNum * batchSize, (batchNum + 1) * batchSize))
+      const trainResult = await LocalEnvironment.ActorModel.trainBatch(batch);
+
+      await LocalEnvironment.ActorModel.saveModel()
+
+      console.log(trainResult)
+    }
+  }
+}
+
+async function main(){
+  let [ playlist ] = await Promise.all([
+    GetPlaylistVideos(playlistID),
+    LocalEnvironment.init(),
+    ActorTraining.launchModel()
+  ])
+
+  for(let epoch = 0; epoch < epochs; epoch++){
+    await DoEpoch(playlist);
+  }
+
+  //await DownloadVideo(playlist[0], LocalEnvironment.Resolution)
+  //let videoRaw = await ReadFile(path.join(__dirname, "video.raw"))
+  //const batch = await CreateBatchData(30, LocalEnvironment.Resolution, videoRaw, 0)
+
+  //console.log(batch)
+}
+
+main()

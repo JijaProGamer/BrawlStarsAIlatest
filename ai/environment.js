@@ -18,6 +18,7 @@ const maxMatchLength = 210;
 
 class Environment {
     Resolution;
+    Framerate;
     screenUsed;
 
     ActorModel;
@@ -75,6 +76,7 @@ class Environment {
         }
 
         this.Resolution = Resolution;
+        this.Framerate = Framerate;
         this.screenUsed = screenUsed;
 
         this.ActorModel = new actorModel(Resolution, Framerate)
@@ -87,17 +89,16 @@ class Environment {
             this.ocrSheduler.addWorker(worker);
         }
 
-        if(!fs.existsSync(path.join(__dirname, "/actor/model/"))){
-            await this.ActorModel.saveModelLayout();
-        }
-
         await Promise.all([
             this.ActorModel.launchModel(),
             this.EnvironmentModel.launchModel(),
             this.Actor.init(this.screenUsed)
         ])
 
-        await this.ActorModel.saveModel()
+        if(!fs.existsSync(path.join(__dirname, "/actor/model/"))){
+            fs.mkdirSync(path.join(__dirname, "/actor/model/"))
+            await this.ActorModel.saveModel();
+        }
 
         this.Started = true;
     }
@@ -110,7 +111,7 @@ class Environment {
     async CreateWorld(Image){
         let environmentResult = await this.EnvironmentModel.predict(Image);
         this.SetModelDetections(environmentResult.predictions)
-        await this.SetScreenDetections(Image);
+        //await this.SetScreenDetections(Image);
 
         return [ environmentResult ]
     }

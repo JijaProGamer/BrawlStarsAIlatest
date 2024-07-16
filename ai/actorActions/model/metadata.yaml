@@ -1,0 +1,20 @@
+description: Ultralytics best model trained on /home/bloxxypc/Desktop/ultralytics_output/Brawl-Stars-Screen-Environment-2/../data.yaml
+author: Ultralytics
+date: '2024-07-14T11:09:09.879872'
+version: 8.2.51
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 224
+- 448
+names:
+  0: Attack
+  1: AttackSphere
+  2: Gadget
+  3: Hypercharge
+  4: MoveButton
+  5: MoveJoystick
+  6: Super

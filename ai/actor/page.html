@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Actor Model</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.1.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
 </head>
 
 <body>
@@ -15,8 +15,6 @@
         let labels;
 
         class ActorModel {
-            Resolution
-
             constructor() {
                 this.epsilon = 0;
                 this.memory = [];
@@ -27,8 +25,46 @@
             }
 
             async loadModel() {
-                this.model = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
-                this.targetModel = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
+                try {
+                    this.model = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
+                } catch(err){
+                    console.log(err)
+                    this.model = this.makeModel();
+                }
+
+                //this.targetModel = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
+
+                const optimizer = tf.train.adam(this.learningRate)
+
+                this.model.compile({
+                    optimizer: optimizer,
+                    loss: tf.losses.huberLoss,
+                    metrics: ['mse'],
+                });
+            }
+
+            makeModel() {
+                const imageInput = tf.input({ shape: [constants.model_size[1], constants.model_size[0], 3], name: 'image_input' });
+                const convLayer1 = tf.layers.depthwiseConv2d({ filters: 32, kernelSize: 7, activation: 'relu' }).apply(imageInput);
+                const maxPoolLayer1 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer1);
+                const convLayer2 = tf.layers.depthwiseConv2d({ filters: 64, kernelSize: 5, activation: 'relu' }).apply(maxPoolLayer1);
+                const convLayer3 = tf.layers.depthwiseConv2d({ filters: 128, kernelSize: 3, activation: 'relu' }).apply(convLayer2);
+                const flattenLayer = tf.layers.flatten().apply(convLayer3);
+
+                const additionalDataInput = tf.input({ shape: [constants.inputElements], name: 'additional_data_input' });
+                const denseLayer1 = tf.layers.dense({ units: 256, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(additionalDataInput);
+                const denseLayer2 = tf.layers.dense({ units: 512, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(denseLayer1);
+                const denseLayer3 = tf.layers.dense({ units: 128, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(denseLayer2);
+
+                const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer3]);
+                const denseLayerFinal = tf.layers.dense({ units: 512, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(concatenated);
+
+                const output = tf.layers.dense({ units: constants.outputElements, activation: 'linear' }).apply(denseLayerFinal);
+
+                const model = tf.model({ inputs: [imageInput, additionalDataInput], outputs: output });
+
+                //model.summary()
+                return model
             }
 
             predict(state) {
@@ -79,6 +115,32 @@
                 this.decayEpsilon()
             }
 
+            async trainBatch(batch) {
+                const imageArray = batch.xs.map(pair => {
+                    const image = tf.browser.fromPixels(createImageDataFromRGBArray(pair[0], constants.model_size))
+                    const resizedImage = tf.image.resizeBilinear(image, [constants.model_size[1], constants.model_size[0]]);
+                    const floatImage = resizedImage.toFloat();
+                    const divImage = floatImage.div(255.0);
+
+                    tf.dispose( [ resizedImage, floatImage, image ] );
+
+                    return divImage;
+                });
+
+                const tensorArray = batch.xs.map(pair => pair[1]);
+
+                const imageTensor = tf.stack(imageArray);
+                const additionalDataTensor = tf.stack(tensorArray);
+                const labelsTensor = tf.stack(batch.ys);
+
+                let fitResults = await this.model.trainOnBatch([ imageTensor, additionalDataTensor ], labelsTensor);
+
+                tf.dispose([ imageTensor, additionalDataTensor, labelsTensor ]);
+                tf.dispose(imageArray);
+
+                return fitResults;
+            }
+
             updateTargetModel() {
                 this.targetModel.setWeights(this.model.getWeights());
             }
@@ -95,6 +157,7 @@
                 const qValues = await tf.tidy(() => {
                     const environmentTensor = tf.tensor1d(environmentData).expandDims(0);
                     const imageTensor = tf.image.resizeBilinear(tf.browser.fromPixels(imageData), [constants.model_size[1], constants.model_size[0]])
+                        .toFloat()
                         .div(255.0)
                         .expandDims(0);
 
@@ -144,6 +207,11 @@
                 case "updateTargetModel":
                     model.updateTargetModel();
                     break;
+                    trainBatch
+                case "trainBatch":
+                    socket.send(JSON.stringify({ id: data.id, trainingResults: await model.trainBatch(data.batch) }));
+
+                    break;
                 case "act":
                     const imageData = createImageDataFromRGBArray(data.image, data.resolution);
 
@@ -170,7 +238,7 @@
 
         async function getModel() {
             await tf.setBackend('webgl');
-            await tf.ready();
+            //await tf.ready();
 
             constants = await (await fetch("/constants.json")).json();
             modelHyperparameters = await (await fetch("/hyperparameters.json")).json();

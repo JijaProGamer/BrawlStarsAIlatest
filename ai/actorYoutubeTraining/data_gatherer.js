@@ -1,10 +1,31 @@
-const playlistID = "PLGtZwVE-T07vYODoUzNweS6upEexk3024";
-
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const ytdl = require('@distube/ytdl-core');
 const axios = require("axios");
 const path = require("path");
+
+const LargeBuffer = require("./largeBuffer.js")
+
+const actorTraining = require("../actorTraining.js");
+const { Environment } = require("../environment.js")
+
+let environmentDetectionSettings = {
+    iouThreshold: 0.85,
+    scoreThreshold: 0.5,
+    softNmsSigma: 0.2,
+}
+
+let screenUsed = 0;
+
+let Resolution = [448, 224]
+let Framerate = 10
+
+const LocalEnvironment = new Environment({
+    Resolution, Framerate, screenUsed,
+    DetectionSettings: environmentDetectionSettings
+})
+
+const ActorTraining = new actorTraining(Resolution, environmentDetectionSettings)
 
 const apikey = fs.readFileSync(path.join(__dirname, "apikey"))
 
@@ -36,7 +57,7 @@ const apikey = fs.readFileSync(path.join(__dirname, "apikey"))
     return videoDetails;
 }*/
 
-async function getPlaylistVideos(id) {
+async function GetPlaylistVideos(id) {
     const result = await axios.get(`https://www.googleapis.com/youtube/v3/playlistItems`, {
         params: {
             part: 'id,snippet',
@@ -49,7 +70,7 @@ async function getPlaylistVideos(id) {
     return result.data.items.map((v) => v.snippet.resourceId.videoId);
 }
 
-async function downloadVideo(id, resolution) {
+async function DownloadVideo(id, resolution) {
     return new Promise(async (resolve, reject) => {
         const info = await ytdl.getInfo(id);
 
@@ -66,95 +87,142 @@ async function downloadVideo(id, resolution) {
 
         const selectedFormat = filteredFormats[0];
 
-        const stream = ytdl(id, { format: selectedFormat })
-            .on('error', error => {
-                console.error('ytdl error:', error);
-                reject(error);
-            });
+        const output = new LargeBuffer();
 
-        ffmpeg(stream)
-            .outputFormat('rawvideo')
-            .videoCodec('rawvideo')
-            .outputFPS(10)
-            .size(resolution.join('x'))
-            .outputOptions([`-pix_fmt rgba`, `-vf scale=${resolution[0]}:${resolution[1]}:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp`])
-            .output(fs.createWriteStream(path.join(__dirname, "video.raw")))
-            .on('end', () => resolve())
-            .on('error', err => reject(err))
-            .run();
+        function tryDownload(run, err) {
+            if (run == 0) reject(err)
+
+            try {
+                const stream = ytdl(id, { format: selectedFormat })
+                    .on('error', error => {
+                        console.error('ytdl error:', error);
+                        reject(error);
+                    });
+
+                ffmpeg(stream)
+                    .outputFormat('rawvideo')
+                    .videoCodec('rawvideo')
+                    .outputFPS(10)
+                    .size(resolution.join('x'))
+                    .noAudio()
+                    //.setStartTime(120) // 2 minutes
+                    //.setDuration(parseInt(info.videoDetails.lengthSeconds, 10) - 120) // 2 minutes
+                    .outputOptions([`-pix_fmt rgba`, `-vf scale=${resolution[0]}:${resolution[1]}:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp`])
+                    .output(output)
+                    //.on("stderr", console.log)
+                    .on('end', () => resolve(output))
+                    .on('error', err => reject(err))
+                    .run();
+            } catch (err) {
+                tryDownload(run - 1, err)
+            }
+        }
+
+        tryDownload(10)
     })
 }
 
-function getFrame(resolution, index, videoRaw){
+function GetFrame(resolution, index, videoRaw) {
     const frameSize = (resolution[0] * resolution[1]) * 4;
     const indexStart = frameSize * index;
     const indexEnd = frameSize * (index + 1);
 
-    const rawFrame = videoRaw.slice(indexStart, indexEnd);
-    const frame = new Uint8Array((frameSize / 4) * 3);
+    if (indexEnd > videoRaw.length || indexStart < 0) {
+        return;
+    }
+
+    //const frame = new Uint8Array((frameSize / 4) * 3);
+    const frame = new Array((frameSize / 4) * 3);
 
     let j = 0;
-    for(let i = 0; i < frameSize; i += 4){
-        frame[j++] = rawFrame[i];
-        frame[j++] = rawFrame[i + 1];
-        frame[j++] = rawFrame[i + 2];
+    for (let i = 0; i < frameSize; i += 4) {
+        frame[j++] = videoRaw.get(indexStart + i);
+        frame[j++] = videoRaw.get(indexStart + i + 1);
+        frame[j++] = videoRaw.get(indexStart + i + 2);
     }
 
     return frame;
 }
 
-function readFile(filePath){
-    return new Promise((resolve, reject) => {
-        const readStream = fs.createReadStream(filePath);
-        const chunks = [];
-    
-        readStream.on('data', (chunk) => {
-            chunks.push(chunk);
-        });
-    
-        readStream.on('end', () => {
-            const buffer = Buffer.concat(chunks);
-            resolve(buffer);
-        });
-    
-        readStream.on('error', (err) => {
-            reject(err);
-        });
-    })
-}
+/*async function CreateBatchData(resolution, video, framesIndices) {
+    const images = [];
 
-const imageToPBM = require("../../screen/imageToPBM")
-
-async function dataGenerator(resolution) {
-    const playlist = await getPlaylistVideos(playlistID)
-
-    //await downloadVideo(playlist[0], resolution)
-    let videoRaw = await readFile(path.join(__dirname, "video.raw"))
-    fs.writeFileSync("image.pbm", imageToPBM(getFrame(resolution, 1030, videoRaw), resolution))
-
-    //console.log(playlist)
-
-    const numElements = 10;
-    let index = 0;
-
-    return function*(){
-        for(let i = 0; i <= numElements; i++){
-            const x = index;
-            index++;
-
-            if(x == numElements){
-                return x;
-            } else {
-                yield x;
-            }
+    for (let i = -2; i < batchSize; i++) {
+        const frame = GetFrame(resolution, lastFrame + i, video)
+        if (frame) {
+            images.push(frame);
+        } else if (i < -2) {
+            //images.push(new Uint8Array(resolution[0] * resolution[1] * 4));
+            images.push(new Array(resolution[0] * resolution[1] * 4));
         }
     }
+
+    fs.writeFileSync("image.pbm", imageToPBM(images[10], resolution))
+
+    const indices = Array.from({ length: images.length - 2 }, (_, i) => 2 + i)
+        .map((v) => { return { v, r: Math.random() } })
+        .sort((a, b) => a.r - b.r)
+        .map(v => v.v);
+
+    let batch = { xs: [], ys: [] }
+
+    for (let i = 0; i < indices.length; i++) {
+        const indice = indices[i];
+
+        await LocalEnvironment.CreateWorld(images[indice]);
+
+        const worldPredictions = LocalEnvironment.PipeEnvironment();
+        const actionsPredictions = (await ActorTraining.predict(images[indice])).predictions;
+
+        const actionsConverted = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1];//actionsPredictions;
+
+        batch.xs.push([images[indice], worldPredictions]);
+        batch.ys.push(actionsConverted);
+    }
+
+    return batch;
+}*/
+
+function calculateActorActions(prediction){
+    let attackButton = prediction.filter((v) => v.class == "Attack")[0];
+    let attachSphere = prediction.filter((v) => v.class == "AttackSphere")[0];
+    let moveButton = prediction.filter((v) => v.class == "MoveButton")[0];
+    let moveSphere = prediction.filter((v) => v.class == "MoveJoystick")[0];
+    let superButton = prediction.filter((v) => v.class == "Super")[0];
+    let gadgetButton = prediction.filter((v) => v.class == "Gadget")[0];
+    let hyperchargeButton = prediction.filter((v) => v.class == "Hypercharge")[0];
+
+    if(!attackButton || !attachSphere || !moveButton || !moveSphere){
+        return null;
+    }
+
+    //let attackCentre = attachSphere
+
+    let actions = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
+
+    return actions;
 }
 
-; (async () => {
-    for (let a of (await dataGenerator([448, 224]))() ) {
-        //console.log(a)
-    }
-})();
+async function CreateBatchData(resolution, video, framesIndices) {
+    let batch = { xs: [], ys: [] }
 
-module.exports = dataGenerator;
+    for (let indice of framesIndices) {
+        const frame = GetFrame(resolution, indice, video)
+        await LocalEnvironment.CreateWorld(frame);
+
+        const worldPredictions = LocalEnvironment.PipeEnvironment();
+        const actionsPredictions = (await ActorTraining.predict(frame)).predictions;
+
+        console.log(actionsPredictions)
+
+        const actionsConverted = calculateActorActions(actionsPredictions);
+        if(actionsConverted == null) continue;
+
+        batch.xs.push([frame, worldPredictions]);
+        batch.ys.push(actionsConverted);
+    }
+
+    return batch;
+}
+
+module.exports = { GetPlaylistVideos, DownloadVideo, CreateBatchData, LocalEnvironment, ActorTraining };

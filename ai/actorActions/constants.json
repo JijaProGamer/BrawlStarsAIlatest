@@ -1,0 +1,12 @@
+{
+    "labels": [   
+        "Attack",
+        "AttackSphere",
+        "Gadget",
+        "Hypercharge",
+        "MoveButton",
+        "MoveJoystick",
+        "Super"
+    ],
+    "model_size": [448, 224]
+}

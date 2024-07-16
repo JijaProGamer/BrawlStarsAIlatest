@@ -1,3 +1,5 @@
 {
-    "model_size": [448, 224]
+    "model_size": [448, 224],
+    "inputElements": 271,
+    "outputElements": 10
 }
