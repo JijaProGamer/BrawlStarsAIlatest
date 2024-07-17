@@ -82,50 +82,115 @@ const path = require("path");
 const playlistID = "PLGtZwVE-T07vYODoUzNweS6upEexk3024";
 
 const epochs = 1;
-const batchSize = 30;
+const batchSize = 32;
+const framesTriedPerBatch = batchSize * 5;
 
-const secondsCutBeggining = 90;
-const secondsCutEnding = 90;
+const secondsCutBeggining = 120;
+const secondsCutEnding = 120;
 
-const framesPerVideo = 1200;
+const framesPerVideo = 2400;
 
 const { GetPlaylistVideos, DownloadVideo, CreateBatchData, LocalEnvironment, ActorTraining } = require("./data_gatherer.js");
 
-async function DoEpoch(playlists){
-  for(let videoId of playlists){
+const batchValues = { xs: [], ys: [] }
+
+let timePerDownload = 0;
+let downloadsDone = 0;
+
+let timePerBatch = 0;
+let batchesDone = 0;
+
+let timePerTrain = 0;
+let trainingsDone = 0;
+
+let timePerVideo = 0;
+let videosDone = 0;
+
+async function DoEpoch(epoch, playlists) {
+  for (let videoId of playlists) {
+    let downloadStart = Date.now();
+
     let videoRaw = await DownloadVideo(videoId, LocalEnvironment.Resolution)
+
+    timePerDownload += Date.now() - downloadStart;
+    downloadsDone += 1;
+
+
     let videoFrames = videoRaw.length / ((LocalEnvironment.Resolution[0] * LocalEnvironment.Resolution[1]) * 4)
-            - secondsCutBeggining * LocalEnvironment.Framerate
-            - secondsCutEnding * LocalEnvironment.Framerate;
+      - secondsCutBeggining * LocalEnvironment.Framerate
+      - secondsCutEnding * LocalEnvironment.Framerate;
 
     let framesUsed = Array.from({ length: videoFrames }, (_, i) => i + (secondsCutBeggining * LocalEnvironment.Framerate))
       .map((v) => { return { v, r: Math.random() } })
       .sort((a, b) => a.r - b.r)
       .map(v => v.v)
       .slice(0, framesPerVideo);
-          
-    let batches = Math.max(framesUsed.length / batchSize);
 
-    for(let batchNum = 0; batchNum < batches; batchNum++){
-      const batch = await CreateBatchData(LocalEnvironment.Resolution, videoRaw, framesUsed.slice(batchNum * batchSize, (batchNum + 1) * batchSize))
-      const trainResult = await LocalEnvironment.ActorModel.trainBatch(batch);
+    let batches = Math.max(framesUsed.length / framesTriedPerBatch);
 
-      await LocalEnvironment.ActorModel.saveModel()
+    for (let batchNum = 0; batchNum < batches; batchNum++) {
+      if (batchesDone > 0) {
+        timeForCurrentBatch = (timePerBatch / batchesDone + timePerTrain / trainingsDone) * (batches - batchNum);
+        console.log(`Remaining time for this video: ${(timeForCurrentBatch / 1000 / 60).toFixed(1)}m`);
 
-      console.log(trainResult)
+        let timeForRemainingEpoch = 0;
+        if (videosDone > 0) {
+          let timeForCurrentVideo = ((timePerVideo/videosDone + timePerDownload / downloadsDone) + (timeForCurrentBatch + timePerDownload / downloadsDone)) * playlists.length;
+          timeForRemainingEpoch = timeForCurrentVideo - timeForCurrentBatch;
+          console.log(`Remaining time for this epoch: ${(timeForRemainingEpoch / 1000 / 60).toFixed(1)}m`);
+        }
+
+        if (videosDone > 0) {
+          let averageTimePerEpoch = totalEpochTime / epochsCompleted;
+          let remainingEpochs = epochs - epochsCompleted - (batchNum > 0 ? 1 : 0);
+          let remainingTimeForTraining = ((averageTimePerEpoch * remainingEpochs) + ((timePerBatch / batchesDone + timePerTrain / trainingsDone) * (batches - batchNum))) / 1000 / 60;
+          console.log(`Remaining time for training: ${remainingTimeForTraining.toFixed(1)}m`);
+        }
+      }
+
+
+      let batchStart = Date.now();
+
+      const batch = await CreateBatchData(LocalEnvironment.Resolution, videoRaw, framesUsed.slice(batchNum * framesTriedPerBatch, (batchNum + 1) * framesTriedPerBatch))
+      batchValues.xs.push(...batch.xs);
+      batchValues.ys.push(...batch.ys);
+
+
+      timePerBatch += Date.now() - batchStart;
+      batchesDone += 1;
+
+      if (batchValues.xs.length >= batchSize) {
+        const trainStart = Date.now();
+
+        const trainResult = await LocalEnvironment.ActorModel.trainBatch({ xs: batch.xs.slice(0, batchSize), ys: batch.ys.slice(0, batchSize) });
+        batch.xs.splice(0, batchSize);
+        batch.ys.splice(0, batchSize);
+
+        await LocalEnvironment.ActorModel.saveModel()
+
+        timePerTrain += Date.now() - trainStart;
+        trainingsDone += 1;
+
+        console.log(trainResult)
+      }
     }
+
+    timePerVideo += Date.now() - downloadStart;
+    videosDone += 1;
   }
+
+  //await LocalEnvironment.ActorModel.saveModel()
 }
 
-async function main(){
-  let [ playlist ] = await Promise.all([
+async function main() {
+  let [playlist] = await Promise.all([
     GetPlaylistVideos(playlistID),
     LocalEnvironment.init(),
     ActorTraining.launchModel()
   ])
 
-  for(let epoch = 0; epoch < epochs; epoch++){
-    await DoEpoch(playlist);
+  for (let epoch = 0; epoch < epochs; epoch++) {
+    await DoEpoch(epoch, playlist);
   }
 
   //await DownloadVideo(playlist[0], LocalEnvironment.Resolution)

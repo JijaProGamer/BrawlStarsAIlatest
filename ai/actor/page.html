@@ -38,8 +38,8 @@
 
                 this.model.compile({
                     optimizer: optimizer,
-                    loss: tf.losses.huberLoss,
-                    metrics: ['mse'],
+                    loss: tf.losses.huberLoss,// tf.losses.meanSquaredError,
+                    metrics: ['mse', 'mae'],
                 });
             }
 

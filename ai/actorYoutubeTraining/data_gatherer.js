@@ -183,22 +183,63 @@ function GetFrame(resolution, index, videoRaw) {
     return batch;
 }*/
 
+function isGoodFrame(prediction){
+    let attackButton = prediction.filter((v) => v.class == "Attack")[0];
+    let attachSphere = prediction.filter((v) => v.class == "AttackSphere")[0];
+    let moveButton = prediction.filter((v) => v.class == "MoveButton")[0];
+    let moveSphere = prediction.filter((v) => v.class == "MoveJoystick")[0];
+
+    return attackButton && attachSphere && moveButton && moveSphere;
+}
+
 function calculateActorActions(prediction){
     let attackButton = prediction.filter((v) => v.class == "Attack")[0];
     let attachSphere = prediction.filter((v) => v.class == "AttackSphere")[0];
     let moveButton = prediction.filter((v) => v.class == "MoveButton")[0];
     let moveSphere = prediction.filter((v) => v.class == "MoveJoystick")[0];
     let superButton = prediction.filter((v) => v.class == "Super")[0];
+    let superSphere = prediction.filter((v) => v.class == "SuperSphere")[0];
     let gadgetButton = prediction.filter((v) => v.class == "Gadget")[0];
     let hyperchargeButton = prediction.filter((v) => v.class == "Hypercharge")[0];
 
-    if(!attackButton || !attachSphere || !moveButton || !moveSphere){
-        return null;
+    let attackButtonCentre = [(attackButton.x1 + attackButton.x2) / 2, (attackButton.x1 + attackButton.y2) / 2];
+    let attachSphereCentre = [(attachSphere.x1 + attachSphere.x2) / 2, (attachSphere.x1 + attachSphere.y2) / 2];
+
+    const attackDirection = [attachSphereCentre[0] - attackButtonCentre[0], attachSphereCentre[1] - attackButtonCentre[1]];
+
+    let moveButtonCentre = [(moveButton.x1 + moveButton.x2) / 2, (moveButton.x1 + moveButton.y2) / 2];
+    let moveSphereCentre = [(moveSphere.x1 + moveSphere.x2) / 2, (moveSphere.x1 + moveSphere.y2) / 2];
+
+    const moveDirection = [moveSphereCentre[0] - moveButtonCentre[0], moveSphereCentre[1] - moveButtonCentre[1]];
+    const moveDirectionMagnitude = Math.sqrt(moveDirection[0]*moveDirection[0] + moveDirection[1]*moveDirection[1]);
+    const normalizedmoveDirection = [moveDirection[0] / moveDirectionMagnitude, moveDirection[1] / moveDirectionMagnitude];
+
+    let superX = -1;
+    let superY = -1;
+
+    if(superButton && superSphere){
+        let superButtonCentre = [(superButton.x1 + superButton.x2) / 2, (superButton.x1 + superButton.y2) / 2];
+        let superSphereCentre = [(superSphere.x1 + superSphere.x2) / 2, (superSphere.x1 + superSphere.y2) / 2];
+
+        superX = superSphereCentre[0] - superButtonCentre[0]
+        superY = superSphereCentre[1] - superButtonCentre[1]
     }
 
-    //let attackCentre = attachSphere
+    let actions = [
+        normalizedmoveDirection[0],     normalizedmoveDirection[1],
+        attackDirection[0]        ,     attackDirection[1]        ,
+        superX                    ,     superY                    ,
+        -1,
+        -1,
+        -1,
+        -1
+    ]
 
-    let actions = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
+    for(let [index, action] of actions.entries()){
+        if(Math.abs(action) < 0.05){
+            actions[index] = 0;
+        }
+    }
 
     return actions;
 }
@@ -208,15 +249,14 @@ async function CreateBatchData(resolution, video, framesIndices) {
 
     for (let indice of framesIndices) {
         const frame = GetFrame(resolution, indice, video)
+
+        const actionsPredictions = (await ActorTraining.predict(frame)).predictions;
+        if(!isGoodFrame(actionsPredictions)) continue;
+
+        const actionsConverted = calculateActorActions(actionsPredictions);
         await LocalEnvironment.CreateWorld(frame);
 
         const worldPredictions = LocalEnvironment.PipeEnvironment();
-        const actionsPredictions = (await ActorTraining.predict(frame)).predictions;
-
-        console.log(actionsPredictions)
-
-        const actionsConverted = calculateActorActions(actionsPredictions);
-        if(actionsConverted == null) continue;
 
         batch.xs.push([frame, worldPredictions]);
         batch.ys.push(actionsConverted);
