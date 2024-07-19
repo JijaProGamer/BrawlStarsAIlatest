@@ -19,7 +19,7 @@
         const socket = new WebSocket(`ws://localhost:${parseInt(location.port) + 1}`);
 
         socket.addEventListener("open", (event) => {
-
+            console.log("websocket connected")
         });
 
         socket.addEventListener("message", async (event) => {
@@ -69,119 +69,20 @@
 
             const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, detectionSettings.iouThreshold, detectionSettings.scoreThreshold);
 
-            //console.time("nms")
-            //const nms = tf.image.nonMaxSuppressionWithScore(boxes, scores, 500, detectionSettings.iouThreshold, detectionSettings.scoreThreshold, detectionSettings.softNmsSigma);
-            //const nms = tf.image.nonMaxSuppression(boxes, scores, 15, detectionSettings.iouThreshold, detectionSettings.scoreThreshold);
-            //console.timeEnd("nms")
+            const boxes_gather = boxes.gather(nms, 0);
+            const scores_gather = scores.gather(nms, 0);
+            const classes_gather = classes.gather(nms, 0);
 
-            const boxes_data = boxes.gather(nms, 0).dataSync();
-            const scores_data = scores.gather(nms, 0).dataSync();
-            const classes_data = classes.gather(nms, 0).dataSync();
+            const boxes_data = boxes_gather.dataSync();
+            const scores_data = scores_gather.dataSync();
+            const classes_data = classes_gather.dataSync();
 
-            tf.dispose([nms, boxes, scores, classes])
+            tf.dispose([ nms, boxes, scores, classes, classes_gather, scores_gather, boxes_gather ])
 
             const predictions = convertPredictions(boxes_data, scores_data, classes_data, data.resolution);
 
-            /*console.time("nms")
-            const boxesData = await boxes.data();//Array.from(boxes.dataSync());
-            const scoresData = await scores.data();
-            const classesData = await classes.data();
-            console.timeEnd("nms")
-
-            const nms = nonMaxSuppression([], [], []);
-            //console.timeEnd("nms")
-
-            tf.dispose([boxes, scores, classes])
-
-            const predictions = convertPredictions(nms.boxes_data, nms.scores_data, nms.classes_data, [xRatio, yRatio], data.resolution);*/
-
-
             socket.send(JSON.stringify({ id: data.id, predictions: predictions }));
         });
-
-        /*function nonMaxSuppression(boxes, scores, classes) {
-            boxes = Array.from({ length: boxes.length / 4 }, (_, i) => boxes.slice(i * 4, i * 4 + 4));
-
-            let boxes_data = [];
-            let scores_data = [];
-            let classes_data = [];
-
-            for (let i = 0; i < boxes.length; i++) {
-                let currentBox = boxes[i];
-                let currentScore = scores[i];
-                let currentClass = classes[i];
-
-                if (currentScore >= detectionSettings.scoreThreshold) {
-                    let shouldAdd = true;
-
-                    for (let j = 0; j < boxes_data.length; j++) {
-                        let existingBox = boxes_data[j];
-                        let existingClass = classes_data[j];
-
-                        if (existingClass !== currentClass) {
-                            continue;
-                        }
-
-                        let iou = calculateIOU(currentBox, existingBox);
-
-                        if (iou >= detectionSettings.iouThreshold) {
-                            shouldAdd = false;
-                            break;
-                        }
-                    }
-
-                    if (shouldAdd) {
-                        boxes_data.push(currentBox);
-                        scores_data.push(currentScore);
-                        classes_data.push(currentClass);
-                    }
-                }
-            }
-
-            return {
-                boxes_data: boxes_data.flat(),
-                scores_data: scores_data,
-                classes_data: classes_data
-            };
-        }*/
-
-        function nonMaxSuppression(boxes, scores, classes) {
-            let output = {
-                boxes_data: [],
-                scores_data: [],
-                classes_data: []  
-            }
-
-            /*for(let i = 0; i < boxes.length; i += 4){
-                if(scores[i/4] >= detectionSettings.scoreThreshold){
-                    output.boxes_data.push(boxes[i], boxes[i + 1], boxes[i + 2], boxes[i + 3])
-                    output.scores_data.push(scores[i])
-                    output.classes_data.push(classes[i])
-                }
-            }*/
-
-            return output
-        }
-
-        function calculateIOU(box1, box2) {
-            let [y1_1, x1_1, y2_1, x2_1] = box1;
-            let [y1_2, x1_2, y2_2, x2_2] = box2;
-
-            let xA = Math.max(x1_1, x1_2);
-            let yA = Math.max(y1_1, y1_2);
-            let xB = Math.min(x2_1, x2_2);
-            let yB = Math.min(y2_1, y2_2);
-
-            let interArea = Math.max(0, xB - xA + 1) * Math.max(0, yB - yA + 1);
-
-            let box1Area = (x2_1 - x1_1 + 1) * (y2_1 - y1_1 + 1);
-            let box2Area = (x2_2 - x1_2 + 1) * (y2_2 - y1_2 + 1);
-
-            let unionArea = box1Area + box2Area - interArea;
-
-            let iou = interArea / unionArea;
-            return iou;
-        }
 
         function createImageDataFromRGBArray(rgbArray, resolution) {
             const [width, height] = resolution;

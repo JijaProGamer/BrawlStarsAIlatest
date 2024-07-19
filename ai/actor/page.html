@@ -34,7 +34,7 @@
 
                 //this.targetModel = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
 
-                const optimizer = tf.train.adam(this.learningRate)
+                const optimizer = tf.train.adam(modelHyperparameters.learningRate)
 
                 this.model.compile({
                     optimizer: optimizer,
@@ -44,20 +44,39 @@
             }
 
             makeModel() {
-                const imageInput = tf.input({ shape: [constants.model_size[1], constants.model_size[0], 3], name: 'image_input' });
-                const convLayer1 = tf.layers.depthwiseConv2d({ filters: 32, kernelSize: 7, activation: 'relu' }).apply(imageInput);
+                /*const imageInput = tf.input({ shape: [constants.model_size[1], constants.model_size[0], 3], name: 'image_input' });
+                const convLayer1 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 32, kernelSize: 3, activation: 'relu', biasInitializer: 'zeros', kernelInitializer: 'heNormal', kernelRegularizer:tf.regularizers.l2({l2: 0.01}), padding: 'same' }).apply(imageInput));
                 const maxPoolLayer1 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer1);
-                const convLayer2 = tf.layers.depthwiseConv2d({ filters: 64, kernelSize: 5, activation: 'relu' }).apply(maxPoolLayer1);
-                const convLayer3 = tf.layers.depthwiseConv2d({ filters: 128, kernelSize: 3, activation: 'relu' }).apply(convLayer2);
+                const convLayer2 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 64, kernelSize: 5, activation: 'relu', biasInitializer: 'zeros', kernelInitializer: 'heNormal', depthwiseInitializer: 'heNormal', kernelRegularizer: tf.regularizers.l2({l2: 0.01}), padding: 'same' }).apply(maxPoolLayer1));
+                const maxPoolLayer2 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer2);
+                const convLayer3 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 128, kernelSize: 7, activation: 'relu', biasInitializer: 'zeros', kernelInitializer: 'heNormal', depthwiseInitializer: 'heNormal', kernelRegularizer: tf.regularizers.l2({l2: 0.01}), padding: 'same' }).apply(maxPoolLayer2));
                 const flattenLayer = tf.layers.flatten().apply(convLayer3);
 
                 const additionalDataInput = tf.input({ shape: [constants.inputElements], name: 'additional_data_input' });
-                const denseLayer1 = tf.layers.dense({ units: 256, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(additionalDataInput);
-                const denseLayer2 = tf.layers.dense({ units: 512, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(denseLayer1);
-                const denseLayer3 = tf.layers.dense({ units: 128, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(denseLayer2);
+                const denseLayer1 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 128, activation: 'relu', biasInitializer: 'zeros', kernelInitializer: 'heNormal', kernelRegularizer: tf.regularizers.l2({l2: 0.01}) }).apply(additionalDataInput));
+                const denseLayer2 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 256, activation: 'relu', biasInitializer: 'zeros', kernelInitializer: 'heNormal', kernelRegularizer: tf.regularizers.l2({l2: 0.01}) }).apply(denseLayer1));
+                const denseLayer3 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 256, activation: 'relu', biasInitializer: 'zeros', kernelInitializer: 'heNormal', kernelRegularizer: tf.regularizers.l2({l2: 0.01}) }).apply(denseLayer2));
 
                 const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer3]);
-                const denseLayerFinal = tf.layers.dense({ units: 512, activation: 'relu', alphaInitializer: 'glorotUniform' }).apply(concatenated);
+                const denseLayerFinal = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 512, activation: 'relu', biasInitializer: 'zeros', kernelInitializer: 'heNormal', kernelRegularizer:tf.regularizers.l2({l2: 0.01}) }).apply(concatenated));
+
+                const output = tf.layers.dense({ units: constants.outputElements, activation: 'linear' }).apply(denseLayerFinal);*/
+
+                const imageInput = tf.input({ shape: [constants.model_size[1], constants.model_size[0], 3], name: 'image_input' });
+                const convLayer1 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 32, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(imageInput));
+                const maxPoolLayer1 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer1);
+                const convLayer2 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 64, kernelSize: 5, activation: 'relu', padding: 'same' }).apply(maxPoolLayer1));
+                const maxPoolLayer2 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer2);
+                const convLayer3 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 128, kernelSize: 7, activation: 'relu', padding: 'same' }).apply(maxPoolLayer2));
+                const flattenLayer = tf.layers.flatten().apply(convLayer3);
+
+                const additionalDataInput = tf.input({ shape: [constants.inputElements], name: 'additional_data_input' });
+                const denseLayer1 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 128, activation: 'relu' }).apply(additionalDataInput));
+                const denseLayer2 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 256, activation: 'relu' }).apply(denseLayer1));
+                const denseLayer3 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 256, activation: 'relu' }).apply(denseLayer2));
+
+                const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer3]);
+                const denseLayerFinal = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 512, activation: "relu" }).apply(concatenated));
 
                 const output = tf.layers.dense({ units: constants.outputElements, activation: 'linear' }).apply(denseLayerFinal);
 
@@ -165,7 +184,7 @@
                     return prediction;
                 }).data();
 
-                const actionProbabilities = [];
+                /*const actionProbabilities = [];
                 for (let i = 0; i < qValues.length; i++) {
                     if (Math.random() <= this.epsilon) {
                         actionProbabilities.push(Math.random() * 2 - 1);
@@ -174,7 +193,8 @@
                     }
                 }
 
-                return actionProbabilities;
+                return actionProbabilities;*/
+                return Object.values(qValues);
             }
         }
 

@@ -2,12 +2,12 @@ train: ../train/images
 val: ../valid/images
 test: ../test/images
 
-nc: 10
-names: ['Ball', 'Enemy', 'Friendly', 'Gem', 'Hot_Zone', 'Me', 'PP', 'PP_Box', 'Safe_Enemy', 'Safe_Friendly']
+nc: 8
+names: ['Attack', 'AttackSphere', 'Gadget', 'Hypercharge', 'MoveButton', 'MoveJoystick', 'Super', 'SuperSphere']
 
 roboflow:
   workspace: bloxxy
-  project: brawl-stars-dataset
-  version: 15
+  project: brawl-stars-screen-environment
+  version: 4
   license: MIT
-  url: https://universe.roboflow.com/bloxxy/brawl-stars-dataset/dataset/15
+  url: https://universe.roboflow.com/bloxxy/brawl-stars-screen-environment/dataset/4

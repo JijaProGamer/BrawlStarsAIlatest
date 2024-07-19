@@ -11,5 +11,17 @@
         "Safe_Enemy",
         "Safe_Friendly"
     ],
-    "model_size": [448, 224]
+    "model_size": [448, 224],
+    "probabilities": {
+        "Ball": 0.4,
+        "Enemy": 0.65,
+        "Friendly": 0.65,
+        "Gem": 0.4,
+        "Hot_Zone": 0.65,
+        "Me": 0.65,
+        "PP": 0.4,
+        "PP_Box": 0.4,
+        "Safe_Enemy": 0.65,
+        "Safe_Friendly": 0.65
+    }
 }

@@ -214,8 +214,8 @@ function calculateActorActions(prediction){
     const moveDirectionMagnitude = Math.sqrt(moveDirection[0]*moveDirection[0] + moveDirection[1]*moveDirection[1]);
     const normalizedmoveDirection = [moveDirection[0] / moveDirectionMagnitude, moveDirection[1] / moveDirectionMagnitude];
 
-    let superX = -1;
-    let superY = -1;
+    let superX = 0;
+    let superY = 0;
 
     if(superButton && superSphere){
         let superButtonCentre = [(superButton.x1 + superButton.x2) / 2, (superButton.x1 + superButton.y2) / 2];
@@ -236,13 +236,15 @@ function calculateActorActions(prediction){
     ]
 
     for(let [index, action] of actions.entries()){
-        if(Math.abs(action) < 0.05){
+        if(Math.abs(action) < 0.1){
             actions[index] = 0;
         }
     }
 
     return actions;
 }
+
+//const imageToBMP = require("../../screen/imageToBMP.js")
 
 async function CreateBatchData(resolution, video, framesIndices) {
     let batch = { xs: [], ys: [] }
@@ -257,6 +259,12 @@ async function CreateBatchData(resolution, video, framesIndices) {
         await LocalEnvironment.CreateWorld(frame);
 
         const worldPredictions = LocalEnvironment.PipeEnvironment();
+
+        /*if(LocalEnvironment.Enemy[0].Position[0] >= 0 && LocalEnvironment.Friendly[0].Position[0] >= 0){
+            if(fs.existsSync("image.bmp")) return;
+            console.log(actionsConverted)
+            fs.writeFileSync("image.bmp", imageToBMP(frame, resolution));
+        }*/
 
         batch.xs.push([frame, worldPredictions]);
         batch.ys.push(actionsConverted);

@@ -41,8 +41,8 @@ async function OnFrame(frame){
     if(!lastFrameEnded || !LocalEnvironment.Started) return;
     lastFrameEnded = false
 
-    const [ environmentResult ] = await LocalEnvironment.ProcessStep(frame);
-    window.webContents.send("environment-detections", [ environmentResult, frame ]);
+    const step = await LocalEnvironment.ProcessStep(frame);
+    window.webContents.send("environment-detections", [ step, frame ]);
     
     //window.webContents.send("environment-detections", [ {predictions:[], duration: 0}, frame ]);
 

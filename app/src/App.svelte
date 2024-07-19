@@ -37,18 +37,18 @@
 		)
 
 		window.electron.on_environment_detections(
-			([ environmentResult, Image ]) => {
-				lastInferencetime = environmentResult.duration.toFixed();
-				lastFrametime = lastInferencetime;
+			([ step, Image ]) => {
+				lastInferencetime = step.environment.visualEnvironmentTime;
+				lastFrametime = lastInferencetime + step.actorTime;
 
 				const imageData = createImageDataFromRGBArray(Image, options.resolution);
 
 				context.putImageData(imageData, 0, 0, 0, 0, canvas.width, canvas.height);
 				contextMain.drawImage(canvas, 0, 0, options.resolution[0], options.resolution[1], 0, 0, canvasMain.width, canvasMain.height);
 
-				const currentPlayer = environmentResult.predictions.find((prediction) => prediction.class = "Me");
+				const currentPlayer = step.environment.visualEnvironmentResult.find((prediction) => prediction.class = "Me");
 
-				for(let environmentData of environmentResult.predictions){
+				for(let environmentData of step.environment.visualEnvironmentResult){
 					renderEnvironmentData(environmentData, currentPlayer)
 				}
 			},

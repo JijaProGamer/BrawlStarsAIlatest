@@ -3,7 +3,7 @@ const Tesseract = require("tesseract.js");
 const os = require('os');
 const { Actor, Player } = require("./actor");
 const actorModel = require("./actorModel.js");
-const environmentModel = require("./environmentModel.js");
+const EnvironmentModel = require("./environment/predict.js");
 const fs = require("fs");
 const Brain = require("./brain.js")
 
@@ -22,7 +22,6 @@ class Environment {
     screenUsed;
 
     ActorModel;
-    EnvironmentModel;
 
     lastActorState;
 
@@ -64,7 +63,7 @@ class Environment {
         }
     }
 
-    constructor({ Resolution, Framerate, DetectionSettings, screenUsed}){
+    constructor({ Resolution, Framerate, screenUsed}){
         for(let i = 0; i < 15; i++){
             this.Friendly.push(new Player());
             this.Enemy.push(new Player());
@@ -80,7 +79,6 @@ class Environment {
         this.screenUsed = screenUsed;
 
         this.ActorModel = new actorModel(Resolution, Framerate)
-        this.EnvironmentModel = new environmentModel(Resolution, DetectionSettings)
     }
 
     async init(){
@@ -91,7 +89,6 @@ class Environment {
 
         await Promise.all([
             this.ActorModel.launchModel(),
-            this.EnvironmentModel.launchModel(),
             this.Actor.init(this.screenUsed)
         ])
 
@@ -104,16 +101,21 @@ class Environment {
     }
 
     quit(){
-        try { this.EnvironmentModel.quit(); } catch(err){};
         try { this.ActorModel.quit(); } catch(err){};
     }
 
     async CreateWorld(Image){
-        let environmentResult = await this.EnvironmentModel.predict(Image);
-        this.SetModelDetections(environmentResult.predictions)
+        let environmentStart = Date.now();
+        let visualEnvironmentResult = await EnvironmentModel.predict(Image);
+        let environmentEnd = Date.now();
+
+        this.SetModelDetections(visualEnvironmentResult)
         //await this.SetScreenDetections(Image);
 
-        return [ environmentResult ]
+        return { 
+            visualEnvironmentResult, 
+            visualEnvironmentTime: environmentEnd - environmentStart
+        }
     }
 
     async SetScreenDetections(Image){
@@ -388,25 +390,33 @@ class Environment {
     }
 
     async ProcessStep(Image){
-        const [ environmentResult ] = await this.CreateWorld(Image);
+        const environment = await this.CreateWorld(Image);
 
-        let actorTime = Date.now()
+        let actorActionsStart = Date.now()
         //let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
-        let actorActions = await Brain(this, Image, this);
+        let actorActionsEnd = Date.now()
+        /*let actorActions = await Brain(this, Image, this);
         actorTime = Date.now() - actorTime;
 
         const reward = this.CalculateRewards();
         if(this.lastActorState){
             this.ActorModel.remember(this.lastActorState, actorActions, reward, [Image, this.PipeEnvironment()], false);
         }
+        
+        this.lastActorState = [Image, this.PipeEnvironment()];*/
 
-        this.lastActorState = [Image, this.PipeEnvironment()];
+        //console.log(actorActions)
+
 
         //let actorActions = await this.fakeActorActions(Image);
         //this.SetActor(actorActions)
         //console.log(actorActions, actorTime);
 
-        return [ environmentResult, actorTime ];
+        return { 
+            environment, 
+            //actorActions,
+            actorTime: actorActionsEnd - actorActionsStart
+        };
     }
 }
 

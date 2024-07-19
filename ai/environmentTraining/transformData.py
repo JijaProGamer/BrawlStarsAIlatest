@@ -5,8 +5,9 @@ import albumentations as A
 
 # Define augmentations
 transform = A.Compose([
-    A.Resize(224, 448),
+    A.Resize(224, 448, cv2.INTER_LANCZOS4),
     #A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0, rotate_limit=0, p=0.35),
+    #A.RandomResizedCrop(height=224, width=448, scale=(0.8, 1.0), ratio=(1.85, 2.15), p=0.35),
     A.RandomBrightnessContrast(p=0.35),
     A.RandomGamma(p=0.35),
     A.RGBShift(p=0.35),
@@ -68,17 +69,17 @@ def process_directory(images_dir, labels_dir, output_images_dir, output_labels_d
 # Define input and output directories
 input_train_images_dir = 'raw_data/train/images'
 input_train_labels_dir = 'raw_data/train/labels'
-output_train_images_dir = 'data/train/images'
-output_train_labels_dir = 'data/train/labels'
+output_train_images_dir = 'datasets/train/images'
+output_train_labels_dir = 'datasets/train/labels'
 
 input_val_images_dir = 'raw_data/valid/images'
 input_val_labels_dir = 'raw_data/valid/labels'
-output_val_images_dir = 'data/valid/images'
-output_val_labels_dir = 'data/valid/labels'
+output_val_images_dir = 'datasets/valid/images'
+output_val_labels_dir = 'datasets/valid/labels'
 
 # Process training and valid folders
 process_directory(input_train_images_dir, input_train_labels_dir, output_train_images_dir, output_train_labels_dir, num_augmentations=25)
 process_directory(input_val_images_dir, input_val_labels_dir, output_val_images_dir, output_val_labels_dir, num_augmentations=25)
 
 # Copy data.yaml file
-shutil.copy('raw_data/data.yaml', 'data/data.yaml')
+shutil.copy('raw_data/data.yaml', 'datasets/data.yaml')

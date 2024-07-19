@@ -3,20 +3,13 @@ process.setMaxListeners(0);
 const { Environment } = require("./ai/environment.js")
 const StartScreen = require("./screen/screen.js")
 
-let environmentDetectionSettings = {
-    iouThreshold: 0.85,
-    scoreThreshold: 0.5,
-    softNmsSigma: 0.2,
-}
-
 let screenUsed = 0;
 
 let Resolution = [448, 224]
 let Framerate = 10
 
 const LocalEnvironment = new Environment({ 
-    Resolution, Framerate, screenUsed,
-    DetectionSettings: environmentDetectionSettings
+    Resolution, Framerate, screenUsed
 })
 
 let lastFrameEnded = true

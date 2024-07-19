@@ -1,4 +1,4 @@
-const puppeteer = require("puppeteer")
+const playwright = require("playwright")
 const express = require('express');
 const path = require("path")
 const uuid = require("uuid")
@@ -144,7 +144,7 @@ class ActorModel {
         resolve()
       });
 
-      this.browser = await puppeteer.launch({
+      this.browser = await playwright.chromium.launch({
         headless: false,
         args: [
           "--no-sandbox",

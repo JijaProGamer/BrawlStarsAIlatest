@@ -92,8 +92,6 @@ const framesPerVideo = 2400;
 
 const { GetPlaylistVideos, DownloadVideo, CreateBatchData, LocalEnvironment, ActorTraining } = require("./data_gatherer.js");
 
-const batchValues = { xs: [], ys: [] }
-
 let timePerDownload = 0;
 let downloadsDone = 0;
 
@@ -108,6 +106,9 @@ let videosDone = 0;
 
 async function DoEpoch(epoch, playlists) {
   for (let videoId of playlists) {
+    const batchValues = { xs: [], ys: [] }
+
+
     let downloadStart = Date.now();
 
     let videoRaw = await DownloadVideo(videoId, LocalEnvironment.Resolution)
@@ -129,32 +130,14 @@ async function DoEpoch(epoch, playlists) {
     let batches = Math.max(framesUsed.length / framesTriedPerBatch);
 
     for (let batchNum = 0; batchNum < batches; batchNum++) {
-      if (batchesDone > 0) {
-        timeForCurrentBatch = (timePerBatch / batchesDone + timePerTrain / trainingsDone) * (batches - batchNum);
-        console.log(`Remaining time for this video: ${(timeForCurrentBatch / 1000 / 60).toFixed(1)}m`);
-
-        let timeForRemainingEpoch = 0;
-        if (videosDone > 0) {
-          let timeForCurrentVideo = ((timePerVideo/videosDone + timePerDownload / downloadsDone) + (timeForCurrentBatch + timePerDownload / downloadsDone)) * playlists.length;
-          timeForRemainingEpoch = timeForCurrentVideo - timeForCurrentBatch;
-          console.log(`Remaining time for this epoch: ${(timeForRemainingEpoch / 1000 / 60).toFixed(1)}m`);
-        }
-
-        if (videosDone > 0) {
-          let averageTimePerEpoch = totalEpochTime / epochsCompleted;
-          let remainingEpochs = epochs - epochsCompleted - (batchNum > 0 ? 1 : 0);
-          let remainingTimeForTraining = ((averageTimePerEpoch * remainingEpochs) + ((timePerBatch / batchesDone + timePerTrain / trainingsDone) * (batches - batchNum))) / 1000 / 60;
-          console.log(`Remaining time for training: ${remainingTimeForTraining.toFixed(1)}m`);
-        }
-      }
-
-
       let batchStart = Date.now();
 
       const batch = await CreateBatchData(LocalEnvironment.Resolution, videoRaw, framesUsed.slice(batchNum * framesTriedPerBatch, (batchNum + 1) * framesTriedPerBatch))
       batchValues.xs.push(...batch.xs);
       batchValues.ys.push(...batch.ys);
 
+      batch.xs.splice(0, batchSize);
+      batch.ys.splice(0, batchSize);
 
       timePerBatch += Date.now() - batchStart;
       batchesDone += 1;
@@ -162,16 +145,48 @@ async function DoEpoch(epoch, playlists) {
       if (batchValues.xs.length >= batchSize) {
         const trainStart = Date.now();
 
-        const trainResult = await LocalEnvironment.ActorModel.trainBatch({ xs: batch.xs.slice(0, batchSize), ys: batch.ys.slice(0, batchSize) });
-        batch.xs.splice(0, batchSize);
-        batch.ys.splice(0, batchSize);
+        const trainResult = await LocalEnvironment.ActorModel.trainBatch({ xs: batchValues.xs.slice(0, batchSize), ys: batchValues.ys.slice(0, batchSize) });
+        batchValues.xs.splice(0, batchSize);
+        batchValues.ys.splice(0, batchSize);
 
         await LocalEnvironment.ActorModel.saveModel()
 
         timePerTrain += Date.now() - trainStart;
         trainingsDone += 1;
 
-        console.log(trainResult)
+        /////////////    L O G S          //////////////////
+
+        if (batchNum > 1) {
+          let timeForCurrentVideo = (timePerBatch / batchesDone + timePerTrain / trainingsDone) * (batches - batchNum);
+          console.log(`Remaining time for this video: ${(timeForCurrentVideo / 1000 / 60).toFixed(1)}m`);
+
+          let timeForRemainingEpoch = 0;
+          if (videosDone == 0) {
+            timeForRemainingEpoch = ((timePerBatch / batchesDone + timePerTrain / trainingsDone) * batches) * playlists.length - timeForCurrentVideo;
+          } else {
+            timeForRemainingEpoch = (timePerVideo / videosDone) * playlists.length - timeForCurrentVideo;
+          }
+
+          console.log(`Remaining time for this epoch: ${(timeForRemainingEpoch / 1000 / 60).toFixed(1)}m`);
+
+          let timeforTraining = 0
+          if (videosDone == 0) {
+            timeforTraining = ((timePerBatch / batchesDone + timePerTrain / trainingsDone) * batches) * playlists.length * epochs - timeForCurrentVideo;
+          } else {
+            timeforTraining = (timePerVideo / videosDone) * playlists.length * epochs - timeForCurrentVideo;
+          }
+
+          console.log(`Remaining time for training: ${(timeforTraining / 1000 / 60).toFixed(1)}m`);
+        }
+
+        console.log(`(Huber) loss: ${trainResult[0]}`)
+        console.log(`MSE: ${trainResult[1]}`)
+        console.log(`MAE loss: ${trainResult[2]}`)
+
+        console.log("----------------------------------------------")
+
+
+        /////////////    L O G S          //////////////////
       }
     }
 
