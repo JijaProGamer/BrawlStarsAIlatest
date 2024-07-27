@@ -41,7 +41,7 @@ function MapImage(Image){
     return Image.map(([r, g, b]) => (r + g + b)/3 > 50 && ((r + g + b)/3) < 150)
 }
 
-const imageToPBM = require("../screen/imageToPBM.js")
+const imageToPBM = require("../screen/general/imageToPBM.js")
 const fs = require("fs")
 
 function CalculateActions(Environment, Image){

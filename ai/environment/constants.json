@@ -1,4 +1,5 @@
 {
+    "model_size": [448, 224],
     "labels": [
         "Ball",
         "Enemy",
@@ -11,7 +12,6 @@
         "Safe_Enemy",
         "Safe_Friendly"
     ],
-    "model_size": [448, 224],
     "probabilities": {
         "Ball": 0.4,
         "Enemy": 0.65,

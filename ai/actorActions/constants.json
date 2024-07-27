@@ -1,5 +1,6 @@
 {
-    "labels": [   
+    "model_size": [448, 224],
+    "labels": [
         "Attack",
         "AttackSphere",
         "Gadget",
@@ -8,5 +9,13 @@
         "MoveJoystick",
         "Super"
     ],
-    "model_size": [448, 224]
+    "probabilities": {
+        "Attack": 0.65,
+        "AttackSphere": 0.65,
+        "Gadget": 0.65,
+        "Hypercharge": 0.65,
+        "MoveButton": 0.65,
+        "MoveJoystick": 0.65,
+        "Super": 0.65
+    }
 }

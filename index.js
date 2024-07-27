@@ -17,9 +17,7 @@ server.use(express.json());
 
 let window;
 let environmentDetectionSettings = {
-    iouThreshold: 0.85,
     scoreThreshold: 0.5,
-    softNmsSigma: 0.2,
 }
 
 let screenUsed = 0;

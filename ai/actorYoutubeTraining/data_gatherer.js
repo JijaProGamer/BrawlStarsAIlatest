@@ -6,7 +6,7 @@ const path = require("path");
 
 const LargeBuffer = require("./largeBuffer.js")
 
-const actorTraining = require("../actorTraining.js");
+const ActorTraining = require("../actorActions/predict.js");
 const { Environment } = require("../environment.js")
 
 let environmentDetectionSettings = {
@@ -21,11 +21,9 @@ let Resolution = [448, 224]
 let Framerate = 10
 
 const LocalEnvironment = new Environment({
-    Resolution, Framerate, screenUsed,
-    DetectionSettings: environmentDetectionSettings
+    Resolution, Framerate, screenUsed
 })
 
-const ActorTraining = new actorTraining(Resolution, environmentDetectionSettings)
 
 const apikey = fs.readFileSync(path.join(__dirname, "apikey"))
 
@@ -244,7 +242,8 @@ function calculateActorActions(prediction){
     return actions;
 }
 
-//const imageToBMP = require("../../screen/imageToBMP.js")
+const drawBoxes = require("../../screen/drawBoxes.js")
+const imageToBMP = require("../../screen/imageToBMP.js")
 
 async function CreateBatchData(resolution, video, framesIndices) {
     let batch = { xs: [], ys: [] }
@@ -252,7 +251,7 @@ async function CreateBatchData(resolution, video, framesIndices) {
     for (let indice of framesIndices) {
         const frame = GetFrame(resolution, indice, video)
 
-        const actionsPredictions = (await ActorTraining.predict(frame)).predictions;
+        const actionsPredictions = await ActorTraining.predict(frame);
         if(!isGoodFrame(actionsPredictions)) continue;
 
         const actionsConverted = calculateActorActions(actionsPredictions);
@@ -263,7 +262,8 @@ async function CreateBatchData(resolution, video, framesIndices) {
         /*if(LocalEnvironment.Enemy[0].Position[0] >= 0 && LocalEnvironment.Friendly[0].Position[0] >= 0){
             if(fs.existsSync("image.bmp")) return;
             console.log(actionsConverted)
-            fs.writeFileSync("image.bmp", imageToBMP(frame, resolution));
+
+            fs.writeFileSync("image.bmp", imageToBMP(drawBoxes(frame, resolution, actionsPredictions), resolution));
         }*/
 
         batch.xs.push([frame, worldPredictions]);

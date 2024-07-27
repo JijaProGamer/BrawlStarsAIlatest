@@ -1,4 +1,4 @@
-# Brawl Stars Screen Environment > 2024-07-18 6:25pm
+# Brawl Stars Screen Environment > raw
 https://universe.roboflow.com/bloxxy/brawl-stars-screen-environment
 
 Provided by a Roboflow user

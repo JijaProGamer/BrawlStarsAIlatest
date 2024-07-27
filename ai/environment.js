@@ -7,11 +7,13 @@ const EnvironmentModel = require("./environment/predict.js");
 const fs = require("fs");
 const Brain = require("./brain.js")
 
-const getBBScores = require("../screen/getBBScores.js");
-const getGBGems = require("../screen/getGBGems.js");
-const getHealth = require("../screen/getHealth.js");
-const getHeistHealth = require("../screen/getHeistHealth.js");
-const getHotzonePercent = require("../screen/getHotzonePercent.js");
+const getBBScores = require("../screen/environmental/getBBScores.js");
+const getGBGems = require("../screen/environmental/getGBGems.js");
+const getHealth = require("../screen/environmental/getHealth.js");
+const getGadget = require("../screen/environmental/getGadget.js");
+const getSuperPercent = require("../screen/environmental/getSuperPercent.js");
+const getHeistHealth = require("../screen/environmental/getHeistHealth.js");
+const getHotzonePercent = require("../screen/environmental/getHotzonePercent.js");
 
 const gamemodesIndices = ["BrawlBall", "GemGrab", "Heist", "Hotzone", "Showdown"];
 const maxMatchLength = 210;
@@ -110,7 +112,7 @@ class Environment {
         let environmentEnd = Date.now();
 
         this.SetModelDetections(visualEnvironmentResult)
-        //await this.SetScreenDetections(Image);
+        await this.SetScreenDetections(Image);
 
         return { 
             visualEnvironmentResult, 
@@ -119,6 +121,11 @@ class Environment {
     }
 
     async SetScreenDetections(Image){
+        this.Actor.HasGadget = getGadget(Image, this.Resolution);
+        this.Actor.SuperCharge = getSuperPercent(Image, this.Resolution);
+
+        console.log(this.Actor.HasGadget, this.Actor.SuperCharge)
+
         switch(this.CurrentMatchType){
             case "BrawlBall":
                 const bbImageData = getBBScores(Image, this.Resolution);
@@ -127,7 +134,7 @@ class Environment {
                 break;
             case "GemGrab":
                 const gbImageData = await getGBGems(Image, this.Resolution, this.ocrSheduler);
-                console.log(gbImageData)
+                //console.log(gbImageData)
                 this.GamemodeEnvironmentData.GemGrab.ScoresEnemy = gbImageData.enemy;
                 this.GamemodeEnvironmentData.GemGrab.ScoresFriendly = gbImageData.friendly;
                 break;
@@ -138,7 +145,7 @@ class Environment {
                 break;
             case "Hotzone":
                 const hotzoneImageData = getHotzonePercent(Image, this.Resolution);
-                console.log(hotzoneImageData);
+                //console.log(hotzoneImageData);
                 this.GamemodeEnvironmentData.Hotzone.PercentEnemy = hotzoneImageData.enemy;
                 this.GamemodeEnvironmentData.Hotzone.PercentFriendly = hotzoneImageData.friendly;
                 break;
@@ -393,7 +400,7 @@ class Environment {
         const environment = await this.CreateWorld(Image);
 
         let actorActionsStart = Date.now()
-        //let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
+        let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
         let actorActionsEnd = Date.now()
         /*let actorActions = await Brain(this, Image, this);
         actorTime = Date.now() - actorTime;

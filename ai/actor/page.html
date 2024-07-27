@@ -27,7 +27,7 @@
             async loadModel() {
                 try {
                     this.model = await tf.loadLayersModel(`http://localhost:${location.port}/model.json`);
-                } catch(err){
+                } catch (err) {
                     console.log(err)
                     this.model = this.makeModel();
                 }
@@ -38,8 +38,8 @@
 
                 this.model.compile({
                     optimizer: optimizer,
-                    loss: tf.losses.huberLoss,// tf.losses.meanSquaredError,
-                    metrics: ['mse', 'mae'],
+                    loss: tf.losses.meanSquaredError,// tf.losses.huberLoss,
+                    //metrics: ['mse', 'mae'],
                 });
             }
 
@@ -62,27 +62,75 @@
 
                 const output = tf.layers.dense({ units: constants.outputElements, activation: 'linear' }).apply(denseLayerFinal);*/
 
+                function makeConvLayer(x, filters, kernelSize, doMaxpooling=true) {
+                    let conv = tf.layers.separableConv2d({ filters, depthMultiplier: 1, kernelSize, useBias: false, depthwiseInitializer: 'heNormal', pointwiseInitializer: 'heNormal', padding: 'same' }).apply(x);
+                    let batchNorm = tf.layers.batchNormalization().apply(conv);
+                    let prelu = tf.layers.prelu().apply(batchNorm);
+
+                    if (doMaxpooling) {
+                        let maxPool = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(prelu);
+
+                        return maxPool;
+                    }
+
+                    return prelu;
+
+                    //let conv = tf.layers.separableConv2d({ filters, depthMultiplier: 1, kernelSize, useBias: false, depthwiseInitializer: 'heNormal', pointwiseInitializer: 'heNormal', padding: 'same', activation: 'relu' }).apply(x);
+                    //return conv;
+                }
+
+                function makeDenseLayer(x, units, activation = "prelu") {
+                    const dense = tf.layers.dense({ units, useBias: false, kernelInitializer: 'heNormal' }).apply(x);
+                    const batchNorm = tf.layers.batchNormalization().apply(dense);
+
+                    if (activation == "prelu") {
+                        const activated = tf.layers.prelu().apply(batchNorm);
+
+                        return activated;
+                    } else {
+                        const activated = tf.layers.activation({ activation: activation }).apply(batchNorm);
+
+                        return activated;
+                    }
+
+                    /*const dense = tf.layers.dense({ units, useBias: false, kernelInitializer: 'heNormal' }).apply(x);
+
+                    if (activation == "prelu") {
+                        const activated = tf.layers.prelu().apply(dense);
+
+                        return activated;
+                    } else {
+                        const activated = tf.layers.activation({ activation: activation }).apply(dense);
+
+                        return activated;
+                    }*/
+                }
+
                 const imageInput = tf.input({ shape: [constants.model_size[1], constants.model_size[0], 3], name: 'image_input' });
-                const convLayer1 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 32, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(imageInput));
-                const maxPoolLayer1 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer1);
-                const convLayer2 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 64, kernelSize: 5, activation: 'relu', padding: 'same' }).apply(maxPoolLayer1));
-                const maxPoolLayer2 = tf.layers.maxPooling2d({ poolSize: [2, 2] }).apply(convLayer2);
-                const convLayer3 = tf.layers.batchNormalization().apply(tf.layers.depthwiseConv2d({ filters: 128, kernelSize: 7, activation: 'relu', padding: 'same' }).apply(maxPoolLayer2));
-                const flattenLayer = tf.layers.flatten().apply(convLayer3);
+                let x = makeConvLayer(imageInput, 16, 11);
+                x = makeConvLayer(x, 32, 7);
+                x = makeConvLayer(x, 64, 5);
+                x = makeConvLayer(x, 128, 3, true); //false in the future
+                x = tf.layers.flatten().apply(x);
+                x = makeDenseLayer(x, 1028);
+                x = makeDenseLayer(x, 512);
+                x = makeDenseLayer(x, 256);
 
                 const additionalDataInput = tf.input({ shape: [constants.inputElements], name: 'additional_data_input' });
-                const denseLayer1 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 128, activation: 'relu' }).apply(additionalDataInput));
-                const denseLayer2 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 256, activation: 'relu' }).apply(denseLayer1));
-                const denseLayer3 = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 256, activation: 'relu' }).apply(denseLayer2));
+                let y = makeDenseLayer(additionalDataInput, 256);
+                y = makeDenseLayer(y, 128);
+                y = makeDenseLayer(y, 128);
 
-                const concatenated = tf.layers.concatenate().apply([flattenLayer, denseLayer3]);
-                const denseLayerFinal = tf.layers.batchNormalization().apply(tf.layers.dense({ units: 512, activation: "relu" }).apply(concatenated));
+                const concatenated = tf.layers.concatenate().apply([x, y]);
+                let z = makeDenseLayer(concatenated, 512);
+                z = makeDenseLayer(z, 256);
+                z = makeDenseLayer(z, 256);
 
-                const output = tf.layers.dense({ units: constants.outputElements, activation: 'linear' }).apply(denseLayerFinal);
+                const output = makeDenseLayer(z, constants.outputElements, "tanh");
 
                 const model = tf.model({ inputs: [imageInput, additionalDataInput], outputs: output });
 
-                //model.summary()
+                model.summary()
                 return model
             }
 
@@ -141,7 +189,7 @@
                     const floatImage = resizedImage.toFloat();
                     const divImage = floatImage.div(255.0);
 
-                    tf.dispose( [ resizedImage, floatImage, image ] );
+                    tf.dispose([resizedImage, floatImage, image]);
 
                     return divImage;
                 });
@@ -152,9 +200,9 @@
                 const additionalDataTensor = tf.stack(tensorArray);
                 const labelsTensor = tf.stack(batch.ys);
 
-                let fitResults = await this.model.trainOnBatch([ imageTensor, additionalDataTensor ], labelsTensor);
+                let fitResults = await this.model.trainOnBatch([imageTensor, additionalDataTensor], labelsTensor);
 
-                tf.dispose([ imageTensor, additionalDataTensor, labelsTensor ]);
+                tf.dispose([imageTensor, additionalDataTensor, labelsTensor]);
                 tf.dispose(imageArray);
 
                 return fitResults;
@@ -175,7 +223,8 @@
             async act(imageData, environmentData) {
                 const qValues = await tf.tidy(() => {
                     const environmentTensor = tf.tensor1d(environmentData).expandDims(0);
-                    const imageTensor = tf.image.resizeBilinear(tf.browser.fromPixels(imageData), [constants.model_size[1], constants.model_size[0]])
+                    const image = tf.browser.fromPixels(createImageDataFromRGBArray(imageData, constants.model_size));
+                    const imageTensor = tf.image.resizeBilinear(image, [constants.model_size[1], constants.model_size[0]])
                         .toFloat()
                         .div(255.0)
                         .expandDims(0);
@@ -233,9 +282,7 @@
 
                     break;
                 case "act":
-                    const imageData = createImageDataFromRGBArray(data.image, data.resolution);
-
-                    let result = await model.act(imageData, data.environment)
+                    let result = await model.act(data.image, data.environment)
                     socket.send(JSON.stringify({ id: data.id, predictions: result }));
 
                     break;
