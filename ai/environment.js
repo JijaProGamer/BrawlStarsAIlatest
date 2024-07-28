@@ -12,6 +12,7 @@ const getGBGems = require("../screen/environmental/getGBGems.js");
 const getHealth = require("../screen/environmental/getHealth.js");
 const getGadget = require("../screen/environmental/getGadget.js");
 const getSuperPercent = require("../screen/environmental/getSuperPercent.js");
+const getHyperchargePercent = require("../screen/environmental/getHyperchargePercent.js")
 const getHeistHealth = require("../screen/environmental/getHeistHealth.js");
 const getHotzonePercent = require("../screen/environmental/getHotzonePercent.js");
 
@@ -123,10 +124,10 @@ class Environment {
     async SetScreenDetections(Image){
         this.Actor.HasGadget = getGadget(Image, this.Resolution);
         this.Actor.SuperCharge = getSuperPercent(Image, this.Resolution);
+        this.Actor.HyperCharge = getHyperchargePercent(Image, this.Resolution);
 
-        console.log(this.Actor.HasGadget, this.Actor.SuperCharge)
-
-        switch(this.CurrentMatchType){
+        console.log(this.Actor.HyperCharge)
+        /*switch(this.CurrentMatchType){
             case "BrawlBall":
                 const bbImageData = getBBScores(Image, this.Resolution);
                 this.GamemodeEnvironmentData.BrawlBall.ScoresEnemy = bbImageData.enemy;
@@ -151,7 +152,7 @@ class Environment {
                 break;
             case "Showdown":
                 break;
-        }
+        }*/
     }
 
     SetModelDetections(prediction){

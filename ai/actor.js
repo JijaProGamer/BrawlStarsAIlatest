@@ -31,6 +31,7 @@ class Actor extends Player {
     Gadgets = 0
     Shoots = 0
     SuperCharge = 0
+    HyperCharge = 0
 
     async init(screenUsed){
         const graphicsInfo = await systeminformation.graphics();

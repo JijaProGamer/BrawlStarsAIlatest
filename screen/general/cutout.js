@@ -20,7 +20,7 @@ function cutout(image, resolution, bbox, convolution) {
             const b = image[index + 2];
 
             if(convolution){
-                let color = convolution(r, g, b);
+                let color = convolution(r, g, b, x, y, bbox);
                 outputImage[lastIndex++] = color[0];
                 outputImage[lastIndex++] = color[1];
                 outputImage[lastIndex++] = color[2];

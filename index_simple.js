@@ -24,9 +24,20 @@ async function OnFrame(frame){
 
 LocalEnvironment.CurrentMatchType = "GemGrab";*/
 
-function isWhitePixel(r, g, b){
-    //return (r > 125 && g > 125 && b > 125 && g*1.25 > b) ? [r, g, b] : [0, 0, 0]
-    return (r > 100 && g > 50 && b < 75) ? [r, g, b] : [0, 0, 0];
+function isWhitePixel(r, g, b, x, y, aabb){
+    let distanceVector = [
+        x/Resolution[0] - (aabb.x1 + aabb.x2) / 2 / Resolution[0], 
+        y/Resolution[1] - (aabb.y1 + aabb.y2) / 2 / Resolution[1]
+    ];
+
+    distanceVector[1]/=2;
+
+    let distance = Math.sqrt(distanceVector[0]*distanceVector[0] + distanceVector[1]*distanceVector[1]);
+
+    //if((distanceX < 0.013 && distanceY < 0.014) || (distanceX > 0.014 && distanceY > 0.015)) return [255, 255, 255];
+    if(distance < 0.012 || distance > 0.017) return [255,255,255];
+
+    return (r > 100 && g < 100 && b > 100) ? [r, g, b] : [0, 0, 0];
 }
 const imageToPBM = require("./screen/general/imageToPBM.js")
 const cutout = require("./screen/general/cutout.js")
@@ -35,11 +46,11 @@ const fs = require("fs")
 let frameIndex = 0
 async function OnFrame(frame){
     const cropped = cutout(frame, Resolution, {
-        x1: Math.round(0.7675 * Resolution[0]), 
-        x2: Math.round(0.8025 * Resolution[0]), 
-        y1: Math.round(0.7875 * Resolution[1]), 
-        y2: Math.round(0.8525 * Resolution[1])
-    },isWhitePixel)
+        x1: Math.round(0.74 * Resolution[0]), 
+        x2: Math.round(0.7750 * Resolution[0]), 
+        y1: Math.round(0.9050 * Resolution[1]), 
+        y2: Math.round(0.965 * Resolution[1])
+    }, isWhitePixel)
 
     const PBM = imageToPBM(cropped.image, cropped.resolution);
     //fs.writeFileSync(`tmp/test_${frameIndex}.pbm`, PBM, "utf-8")

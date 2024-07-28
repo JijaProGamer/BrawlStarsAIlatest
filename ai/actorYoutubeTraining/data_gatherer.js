@@ -242,20 +242,26 @@ function calculateActorActions(prediction){
     return actions;
 }
 
-const drawBoxes = require("../../screen/drawBoxes.js")
-const imageToBMP = require("../../screen/imageToBMP.js")
+//const drawBoxes = require("../../screen/drawBoxes.js")
+//const imageToBMP = require("../../screen/imageToBMP.js")
 
-async function CreateBatchData(resolution, video, framesIndices) {
+/*async function CreateBatchData(resolution, video, framesIndices) {
     let batch = { xs: [], ys: [] }
 
     for (let indice of framesIndices) {
         const frame = GetFrame(resolution, indice, video)
 
+        console.time("actions")
         const actionsPredictions = await ActorTraining.predict(frame);
+        console.timeEnd("actions")
+
         if(!isGoodFrame(actionsPredictions)) continue;
 
         const actionsConverted = calculateActorActions(actionsPredictions);
+
+        console.time("environment")
         await LocalEnvironment.CreateWorld(frame);
+        console.timeEnd("environment")
 
         const worldPredictions = LocalEnvironment.PipeEnvironment();
 
@@ -264,7 +270,33 @@ async function CreateBatchData(resolution, video, framesIndices) {
             console.log(actionsConverted)
 
             fs.writeFileSync("image.bmp", imageToBMP(drawBoxes(frame, resolution, actionsPredictions), resolution));
-        }*/
+        }
+
+        batch.xs.push([frame, worldPredictions]);
+        batch.ys.push(actionsConverted);
+    }
+
+    return batch;
+}*/
+
+async function CreateBatchData(resolution, video, framesIndices) {
+    let batch = { xs: [], ys: [] }
+
+    for (let indice of framesIndices) {
+        const frame = GetFrame(resolution, indice, video)
+
+        console.time("actions")
+        const [ actionsPredictions ] = await Promise.all([
+            ActorTraining.predict(frame),
+            LocalEnvironment.CreateWorld(frame)
+        ])
+        console.timeEnd("actions")
+
+        if(!isGoodFrame(actionsPredictions)) continue;
+
+        const actionsConverted = calculateActorActions(actionsPredictions);
+
+        const worldPredictions = LocalEnvironment.PipeEnvironment();
 
         batch.xs.push([frame, worldPredictions]);
         batch.ys.push(actionsConverted);

@@ -1,8 +1,8 @@
 const friendlyAABB = {
-    x1: 0.7675,
-    x2: 0.8015,
-    y1: 0.7900,
-    y2: 0.8500,
+    x1: 0.74,
+    x2: 0.7750,
+    y1: 0.9050,
+    y2: 0.965,
 }
 
 let centerAABB = {
@@ -11,7 +11,7 @@ let centerAABB = {
 }
 
 function isGoodPixel(r, g, b){
-    return r > 100 && g > 100 && b < 75;
+    return (r > 100 && g < 100 && b > 100) || (r > 200 && b > 200 && g > 200);
 }
 function getSuperPercent(image, resolution){
     let pixelsFull = 0;
@@ -47,9 +47,9 @@ function getSuperPercent(image, resolution){
             pixelsFull += 1;
         }
     }
+
     if(goodPixelsFull/pixelsFull > 0.5) return 1;
-    
-    return Math.round((goodPixels/pixels * 1.75) * 15) / 15;
+    return Math.round((goodPixels/pixels * 1.5) * 15) / 15;
 }
 
 module.exports = getSuperPercent;
