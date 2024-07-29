@@ -46,11 +46,16 @@ const fs = require("fs")
 let frameIndex = 0
 async function OnFrame(frame){
     const cropped = cutout(frame, Resolution, {
-        x1: Math.round(0.74 * Resolution[0]), 
-        x2: Math.round(0.7750 * Resolution[0]), 
-        y1: Math.round(0.9050 * Resolution[1]), 
-        y2: Math.round(0.965 * Resolution[1])
-    }, isWhitePixel)
+        /*x1: Math.round(0.41 * Resolution[0]), 
+        x2: Math.round(0.47 * Resolution[0]), 
+        y1: Math.round(0.73 * Resolution[1]), 
+        y2: Math.round(0.89 * Resolution[1])*/
+
+        x1: 131,
+        y1: 24,
+        x2: 131 + Math.round(0.09 * Resolution[0]),
+        y2: 24 + Math.round(0.2 * Resolution[1]),
+    })//, isWhitePixel)
 
     const PBM = imageToPBM(cropped.image, cropped.resolution);
     //fs.writeFileSync(`tmp/test_${frameIndex}.pbm`, PBM, "utf-8")

@@ -15,6 +15,7 @@ const getSuperPercent = require("../screen/environmental/getSuperPercent.js");
 const getHyperchargePercent = require("../screen/environmental/getHyperchargePercent.js")
 const getHeistHealth = require("../screen/environmental/getHeistHealth.js");
 const getHotzonePercent = require("../screen/environmental/getHotzonePercent.js");
+const imageToBMP = require("../screen/general/imageToBMP.js");
 
 const gamemodesIndices = ["BrawlBall", "GemGrab", "Heist", "Hotzone", "Showdown"];
 const maxMatchLength = 210;
@@ -112,7 +113,7 @@ class Environment {
         let visualEnvironmentResult = await EnvironmentModel.predict(Image);
         let environmentEnd = Date.now();
 
-        this.SetModelDetections(visualEnvironmentResult)
+        await this.SetModelDetections(Image, visualEnvironmentResult)
         await this.SetScreenDetections(Image);
 
         return { 
@@ -126,7 +127,6 @@ class Environment {
         this.Actor.SuperCharge = getSuperPercent(Image, this.Resolution);
         this.Actor.HyperCharge = getHyperchargePercent(Image, this.Resolution);
 
-        console.log(this.Actor.HyperCharge)
         /*switch(this.CurrentMatchType){
             case "BrawlBall":
                 const bbImageData = getBBScores(Image, this.Resolution);
@@ -155,7 +155,7 @@ class Environment {
         }*/
     }
 
-    SetModelDetections(prediction){
+    async SetModelDetections(Image, prediction){
         let me = prediction.filter((v) => v.class == "Me")[0];
         let friendly = prediction.filter((v) => v.class == "Friendly");
         let enemy = prediction.filter((v) => v.class == "Enemy");
@@ -232,26 +232,32 @@ class Environment {
             }
         }
 
-        function setPlayer(player, playerData){
+        let setPlayer = async (player, playerData) => {
             if(playerData){
                 //player.Position = [(playerData.x1 + playerData.x2) / 2, (playerData.x1 + playerData.y2) / 2];
                 const biggestY = playerData.y1 > playerData.y2 ? playerData.y1 : playerData.y2;
                 player.Position = [(playerData.x1 + playerData.x2) / 2, biggestY - 0.07];
+
+                player.Health = (await getHealth(Image, imageToBMP(Image, this.Resolution), this.Resolution, this.ocrSheduler, playerData)).health
             } else {
                 player.Position = [-1, -1];
                 player.Health = 0;
             }
         }
 
-        setPlayer(this.Actor, me);
+        let playerPromises = []
+
+        playerPromises.push(setPlayer(this.Actor, me));
 
         for(let i = 0; i < 15; i++){
-            setPlayer(this.Friendly[i], friendly[i]);
+            playerPromises.push(setPlayer(this.Friendly[i], friendly[i]));
         }
 
         for(let i = 0; i < 15; i++){
-            setPlayer(this.Enemy[i], enemy[i]);
+            playerPromises.push(setPlayer(this.Enemy[i], enemy[i]));
         }
+
+        await Promise.all(playerPromises)
     }
 
     SetActor(prediction){
@@ -401,7 +407,7 @@ class Environment {
         const environment = await this.CreateWorld(Image);
 
         let actorActionsStart = Date.now()
-        let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
+        //let actorActions = await this.ActorModel.act(Image, this.PipeEnvironment());
         let actorActionsEnd = Date.now()
         /*let actorActions = await Brain(this, Image, this);
         actorTime = Date.now() - actorTime;

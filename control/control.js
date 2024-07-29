@@ -37,6 +37,8 @@ class MouseControlType {
     }
 
     move(position){
+        position[1] = -position[1];
+        
         let positionDistance = Math.sqrt(position[0] * position[0] + position[1] * position[1]);
 
         if(positionDistance < 0.1){

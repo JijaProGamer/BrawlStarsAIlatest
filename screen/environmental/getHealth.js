@@ -1,78 +1,79 @@
-const playerWidth = 0.05;
-const playerHeight = 0.175;
+const playerWidth = 0.09;
+const playerHeight = 0.2;
 
-function isFriendlyPixel(r, g, b){
-    return r < 75 && g > 200 && b < 100
+function isFriendlyPixel(r, g, b) {
+    return (r < 50 && g > 200 && b > 200) || (r > 150 && g > 200 && b > 200);
 }
 
-function isMePixel(r, g, b){
-    return r < 75 && g < 150 && b > 200
+function isMePixel(r, g, b) {
+    return (r < 100 && g > 150 && b > 50 && r > 60 && b < 100) || (r < 175 && b > 100 && g > 200 && r > 150 && b > 100);
 }
 
-function isEnemyPixel(r, g, b){
-    return r > 200 && g < 150 && b < 200
+function isEnemyPixel(r, g, b) {
+    return r > 150 && g < 75 && b < 100;
 }
 
-function isEmptyPixel(r, g, b){
-    return r < 100 && g < 100 && b < 100
+function isEmptyPixel(r, g, b) {
+    return r < 60 && g < 60 && b < 105 && r > 25 && g > 25 && b > 70;
 }
 
-async function getHealth(image, imageBuffer, resolution, ocrSheduler, player){
-    const currentPixelX = Math.floor((player.x1 < player.x2 ? player.x1 : player.x2) * resolution[0]);
-    const currentPixelY = Math.ceil((player.y1 > player.y2 ? player.y2 : player.y1) * resolution[1]);
+async function getHealth(image, imageBuffer, resolution, ocrSheduler, player) {
+    const currentPixelX = Math.floor(((player.x1 < player.x2 ? player.x1 : player.x2) - 0.02) * resolution[0]);
+    const currentPixelY = Math.ceil(((player.y1 > player.y2 ? player.y2 : player.y1) - 0.02) * resolution[1]);
 
-    let bestHealthlineX = -1;
-    let bestHealthlineY = -1;
     let bestCorrectPixels = 0;
+    let bestFullPixels = 0;
     let bestEmptyPixels = 0;
 
-    for(let x = currentPixelX; x < currentPixelX + playerWidth * resolution[0]; x++){
-        for(let y = currentPixelY; x < currentPixelY + playerHeight * resolution[0]; y++){
+    for (let y = currentPixelY; y < currentPixelY + playerHeight * resolution[1]; y++) {
+        let fullPixels = 0;
+        let emptyPixels = 0;
 
-            let goodPixels = 0;
-            let emptyPixels = 0;
+        for (let lx = currentPixelX; lx < currentPixelX + playerWidth * resolution[0]; lx++) {
+            const index = (y * resolution[0] + lx) * 3;
+            const r = image[index];
+            const g = image[index + 1];
+            const b = image[index + 2];
 
-            for(let lx = x; lx < x + playerWidth * resolution[0]; lx++){
-                const index = (lx * resolution[0] + y) * 3;
-                const r = image[index];
-                const g = image[index + 1];
-                const b = image[index + 2];
-                
-                if(isEmptyPixel(r, g, b)) {
-                    bestCorrectPixels ++;
-                    emptyPixels ++;
-                }
-
-                switch(player.class){
+            if (isEmptyPixel(r, g, b)) {
+                emptyPixels++;
+                fullPixels++;
+            } else {
+                switch (player.class) {
                     case "Me":
-                        if(isMePixel(r, g, b)) bestCorrectPixels ++;
+                        if (isMePixel(r, g, b)) fullPixels++;
                         break;
                     case "Enemy":
-                        if(isEnemyPixel(r, g, b)) bestCorrectPixels ++;
+                        if (isEnemyPixel(r, g, b)) fullPixels++;
                         break;
                     case "Friendly":
-                        if(isFriendlyPixel(r, g, b)) bestCorrectPixels ++;
+                        if (isFriendlyPixel(r, g, b)) fullPixels++;
                         break;
                 }
-            }
 
-            if(goodPixels > bestCorrectPixels){
-                bestCorrectPixels = goodPixels;
-                bestEmptyPixels = emptyPixels;
-                bestHealthlineX = lx;
-                bestHealthlineY = y;
+                /*if(isMePixel(r, g, b) || isEnemyPixel(r, g, b) || isFriendlyPixel(r, g, b)){
+                    goodPixels ++;
+                }*/
             }
+        }
+
+        if ((fullPixels + emptyPixels) > bestCorrectPixels) {
+            bestCorrectPixels = (fullPixels + emptyPixels);
+
+            bestEmptyPixels = emptyPixels;
+            bestFullPixels = fullPixels;
         }
     }
 
-    const health = parseInt((await ocrSheduler.addJob('detect', imageBuffer)).data.text);
-    const healthPrecent = 1 - bestEmptyPixels/bestCorrectPixels;
-    const fullHealth = health * 1/healthPrecent;
-    
+    /*const health = parseInt((await ocrSheduler.addJob('recognize', imageBuffer)).data.text);
+    const healthPrecent = bestFullPixels / bestCorrectPixels;
+    const fullHealth = health * 1/healthPrecent;*/
+
     return {
-        health, 
+        /*health, 
         fullHealth,
-        healthPrecent
+        healthPrecent*/
+        health: bestFullPixels / bestCorrectPixels,
     }
 }
 

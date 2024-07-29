@@ -190,6 +190,11 @@ function isGoodFrame(prediction){
     return attackButton && attachSphere && moveButton && moveSphere;
 }
 
+let hadSuper = false;
+let hadHypercharge = false;
+let hadGadget = false;
+let shootsLeft = 3;
+
 function calculateActorActions(prediction){
     let attackButton = prediction.filter((v) => v.class == "Attack")[0];
     let attachSphere = prediction.filter((v) => v.class == "AttackSphere")[0];
@@ -223,14 +228,33 @@ function calculateActorActions(prediction){
         superY = superSphereCentre[1] - superButtonCentre[1]
     }
 
+    let didShoot, didUltra, didHypercharge, didGadget;
+
+    if(LocalEnvironment.Actor.Shoots < shootsLeft){
+        didShoot = true
+    }
+
+    if(LocalEnvironment.Actor.SuperCharge < 1 && hadSuper){
+        didUltra = true
+    }
+
+    if(!LocalEnvironment.Actor.HyperCharge < 1 && hadHypercharge){
+        didHypercharge = true
+    }
+
+
+    if(!LocalEnvironment.Actor.HasGadget && hadGadget){
+        didGadget = true
+    }
+
     let actions = [
-        normalizedmoveDirection[0],     normalizedmoveDirection[1],
-        attackDirection[0]        ,     attackDirection[1]        ,
-        superX                    ,     superY                    ,
-        -1,
-        -1,
-        -1,
-        -1
+        normalizedmoveDirection[0],     -normalizedmoveDirection[1],
+        attackDirection[0]        ,     -attackDirection[1]        ,
+        superX                    ,     -superY                    ,
+        didShoot ? 1 : -1,
+        didUltra ? 1 : -1,
+        didHypercharge ? 1 : -1,
+        didGadget ? 1 : -1
     ]
 
     for(let [index, action] of actions.entries()){
@@ -239,29 +263,30 @@ function calculateActorActions(prediction){
         }
     }
 
+    hadSuper = LocalEnvironment.Actor.SuperCharge == 1;
+    hadGadget = LocalEnvironment.Actor.HasGadget;
+    hadHypercharge = LocalEnvironment.Actor.HyperCharge == 1;
+    shootsLeft = LocalEnvironment.Actor.Shoots;
+
     return actions;
 }
 
 //const drawBoxes = require("../../screen/drawBoxes.js")
 //const imageToBMP = require("../../screen/imageToBMP.js")
 
-/*async function CreateBatchData(resolution, video, framesIndices) {
+async function CreateBatchData(resolution, video, framesIndices) {
     let batch = { xs: [], ys: [] }
 
     for (let indice of framesIndices) {
         const frame = GetFrame(resolution, indice, video)
 
-        console.time("actions")
         const actionsPredictions = await ActorTraining.predict(frame);
-        console.timeEnd("actions")
 
         if(!isGoodFrame(actionsPredictions)) continue;
 
         const actionsConverted = calculateActorActions(actionsPredictions);
 
-        console.time("environment")
         await LocalEnvironment.CreateWorld(frame);
-        console.timeEnd("environment")
 
         const worldPredictions = LocalEnvironment.PipeEnvironment();
 
@@ -270,16 +295,16 @@ function calculateActorActions(prediction){
             console.log(actionsConverted)
 
             fs.writeFileSync("image.bmp", imageToBMP(drawBoxes(frame, resolution, actionsPredictions), resolution));
-        }
+        }*/
 
         batch.xs.push([frame, worldPredictions]);
         batch.ys.push(actionsConverted);
     }
 
     return batch;
-}*/
+}
 
-async function CreateBatchData(resolution, video, framesIndices) {
+/*async function CreateBatchData(resolution, video, framesIndices) {
     let batch = { xs: [], ys: [] }
 
     for (let indice of framesIndices) {
@@ -303,6 +328,6 @@ async function CreateBatchData(resolution, video, framesIndices) {
     }
 
     return batch;
-}
+}*/
 
 module.exports = { GetPlaylistVideos, DownloadVideo, CreateBatchData, LocalEnvironment, ActorTraining };
